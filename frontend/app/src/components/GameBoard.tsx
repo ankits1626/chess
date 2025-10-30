@@ -7,14 +7,16 @@ import type {
   ChessRank,
   ChessPiece,
   PieceType,
-  PieceColor
+  PieceColor,
 } from '../types/chess';
 
 interface GameBoardProps {
   game: Chess;
+  selectedSquare: SquareType | null;
+  onSquareClick: (square: SquareType) => void;
 }
 
-const GameBoard = ({ game }: GameBoardProps) => {
+const GameBoard = ({ game, selectedSquare, onSquareClick }: GameBoardProps) => {
   const board = game.board();
 
   const files: ChessFile[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
@@ -41,10 +43,12 @@ const GameBoard = ({ game }: GameBoardProps) => {
 
       // Get piece from board
       const chessJsPiece = board[7 - rankIndex][fileIndex];
-      const pieceData = chessJsPiece ? {
-        type: chessJsPiece.type as PieceType,
-        color: chessJsPiece.color as PieceColor
-      } : null;
+      const pieceData = chessJsPiece
+        ? {
+            type: chessJsPiece.type as PieceType,
+            color: chessJsPiece.color as PieceColor,
+          }
+        : null;
 
       squares.push({ name: squareName, color: squareColor, piece: pieceData });
     }
@@ -54,12 +58,16 @@ const GameBoard = ({ game }: GameBoardProps) => {
     <div className="relative">
       {/* Rank labels (8-1) on the left */}
       <div className="absolute -left-6 top-0 h-[min(100vw,calc(100vh-4rem))] flex flex-col justify-around text-gray-400 text-sm transition-all duration-300">
-        {ranks.slice().reverse().map(rank => (
-          <span key={`rank-${rank}`} className="flex items-center justify-center">{rank}</span>
-        ))}
+        {ranks
+          .slice()
+          .reverse()
+          .map((rank) => (
+            <span key={`rank-${rank}`} className="flex items-center justify-center h-full">
+              {rank}
+            </span>
+          ))}
       </div>
 
-      {/* Chess board grid */}
       <div className="w-[min(100vw,calc(100vh-4rem))] h-[min(100vw,calc(100vh-4rem))] mx-auto grid grid-cols-8 grid-rows-8 border-2 border-gray-900 transition-all duration-300">
         {squares.map((square) => (
           <Square
@@ -67,14 +75,18 @@ const GameBoard = ({ game }: GameBoardProps) => {
             squareColor={square.color}
             squareName={square.name}
             piece={square.piece}
+            isSelected={selectedSquare === square.name}
+            onClick={() => onSquareClick(square.name)}
           />
         ))}
       </div>
 
       {/* File labels (a-h) at the bottom */}
       <div className="w-[min(100vw,calc(100vh-4rem))] mx-auto flex justify-around text-gray-400 text-sm mt-2 transition-all duration-300">
-        {files.map(file => (
-          <span key={`file-${file}`}>{file}</span>
+        {files.map((file) => (
+          <span key={`file-${file}`} className="flex items-center justify-center w-full">
+            {file}
+          </span>
         ))}
       </div>
     </div>

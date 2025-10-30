@@ -5,21 +5,26 @@ interface SquareProps {
   squareColor: SquareColor;
   squareName: SquareType;
   piece: ChessPiece | null;
+  isSelected: boolean;
+  onClick: () => void;
 }
 
-const Square = ({ squareColor, squareName, piece }: SquareProps) => {
+const Square = ({ squareColor, squareName, piece, isSelected, onClick }: SquareProps) => {
   const bgColor = squareColor === 'light'
-    ? 'bg-[#e8edd5]'  // Light green (like chess.com)
-    : 'bg-[#759656]'; // Dark green
+    ? 'bg-[#e8edd5]'
+    : 'bg-[#759656]';
 
   return (
     <div
-      className={`${bgColor} flex items-center justify-center relative`}
+      className={`
+        ${bgColor}
+        ${isSelected ? 'ring-4 ring-yellow-400 ring-inset' : ''}
+        flex items-center justify-center relative cursor-pointer
+        hover:brightness-90 transition-all
+      `}
+      onClick={onClick}
     >
       {piece && <Piece piece={piece} />}
-      <span className="absolute bottom-0 right-1 text-xs opacity-30 select-none z-0">
-        {squareName}
-      </span>
     </div>
   );
 };

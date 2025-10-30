@@ -6,9 +6,13 @@ function App() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-800 text-white p-8">
       <GameController>
-        {(game) => (
+        {(game, selectedSquare, selectSquare) => (
           <div className="flex flex-row gap-8 items-center">
-            <GameBoard game={game} />
+            <GameBoard
+              game={game}
+              selectedSquare={selectedSquare}
+              onSquareClick={selectSquare}
+            />
             <GameInfo game={game} />
           </div>
         )}
