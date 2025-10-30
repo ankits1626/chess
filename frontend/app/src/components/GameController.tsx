@@ -45,8 +45,8 @@ const GameController = ({ children }: GameControllerProps) => {
       });
 
       if (move) {
-        // Move was successful, update state
-        setGame(new Chess(game.fen())); // Create new instance to trigger re-render
+        // Move was successful, create a new object reference to trigger re-render
+        setGame(Object.assign(Object.create(Object.getPrototypeOf(game)), game));
         setSelectedSquare(null);
         setValidMoves([]);
       } else {
