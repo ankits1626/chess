@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+build/
+dist/
+
+# Misc
+.DS_Store
+*.log
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+# .vscode/ - Keep .vscode/ committed for shared workspace settings
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.cache/
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Python (if backend added later)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Package manager
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
