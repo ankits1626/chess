@@ -1,4 +1,4 @@
-import { Chess } from 'chess.js';
+import type { Chess } from 'chess.js';
 import Square from './Square';
 import type {
   SquareColor,
@@ -10,8 +10,11 @@ import type {
   PieceColor
 } from '../types/chess';
 
-const GameBoard = () => {
-  const game = new Chess();
+interface GameBoardProps {
+  game: Chess;
+}
+
+const GameBoard = ({ game }: GameBoardProps) => {
   const board = game.board();
 
   const files: ChessFile[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
