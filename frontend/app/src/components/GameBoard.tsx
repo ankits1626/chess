@@ -1,11 +1,27 @@
+import { Chess } from 'chess.js';
 import Square from './Square';
-import type { SquareColor, Square as SquareType, ChessFile, ChessRank } from '../types/chess';
+import type {
+  SquareColor,
+  Square as SquareType,
+  ChessFile,
+  ChessRank,
+  ChessPiece,
+  PieceType,
+  PieceColor
+} from '../types/chess';
 
 const GameBoard = () => {
+  const game = new Chess();
+  const board = game.board();
+
   const files: ChessFile[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
   const ranks: ChessRank[] = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
-  const squares: Array<{ name: SquareType; color: SquareColor }> = [];
+  const squares: Array<{
+    name: SquareType;
+    color: SquareColor;
+    piece: ChessPiece | null;
+  }> = [];
 
   // Iterate from rank 8 down to rank 1 (top to bottom visually)
   for (let rankIndex = 7; rankIndex >= 0; rankIndex--) {
@@ -16,23 +32,48 @@ const GameBoard = () => {
       const file = files[fileIndex];
       const squareName = `${file}${rank}` as SquareType;
 
-      // Correct color calculation: a1 should be dark.
+      // Calculate color
       const isLight = (rankIndex + fileIndex) % 2 !== 0;
       const squareColor: SquareColor = isLight ? 'light' : 'dark';
 
-      squares.push({ name: squareName, color: squareColor });
+      // Get piece from board
+      const chessJsPiece = board[7 - rankIndex][fileIndex];
+      const pieceData = chessJsPiece ? {
+        type: chessJsPiece.type as PieceType,
+        color: chessJsPiece.color as PieceColor
+      } : null;
+
+      squares.push({ name: squareName, color: squareColor, piece: pieceData });
     }
   }
 
   return (
-    <div className="w-[min(100vw,100vh)] h-[min(100vw,100vh)] mx-auto grid grid-cols-8 border-2 border-gray-900">
-      {squares.map((square) => (
-        <Square
-          key={square.name}
-          squareColor={square.color}
-          squareName={square.name}
-        />
-      ))}
+    <div className="relative">
+      {/* Rank labels (8-1) on the left */}
+      <div className="absolute -left-6 top-0 h-[min(100vw,calc(100vh-4rem))] flex flex-col justify-around text-gray-400 text-sm transition-all duration-300">
+        {ranks.slice().reverse().map(rank => (
+          <span key={`rank-${rank}`} className="flex items-center justify-center">{rank}</span>
+        ))}
+      </div>
+
+      {/* Chess board grid */}
+      <div className="w-[min(100vw,calc(100vh-4rem))] h-[min(100vw,calc(100vh-4rem))] mx-auto grid grid-cols-8 grid-rows-8 border-2 border-gray-900 transition-all duration-300">
+        {squares.map((square) => (
+          <Square
+            key={square.name}
+            squareColor={square.color}
+            squareName={square.name}
+            piece={square.piece}
+          />
+        ))}
+      </div>
+
+      {/* File labels (a-h) at the bottom */}
+      <div className="w-[min(100vw,calc(100vh-4rem))] mx-auto flex justify-around text-gray-400 text-sm mt-2 transition-all duration-300">
+        {files.map(file => (
+          <span key={`file-${file}`}>{file}</span>
+        ))}
+      </div>
     </div>
   );
 };
