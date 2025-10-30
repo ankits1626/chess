@@ -83,7 +83,11 @@ The implementation will be done in the following order:
 8.  **Valid Move Highlighting:** When a piece is selected, `GameController.tsx` will calculate the valid moves for that piece, and `GameBoard.tsx` will highlight the corresponding squares.
 9.  **Game Information Display:** Implement `GameInfo.tsx` to display the current player's turn and other game state information.
 10. **Pawn Promotion:** Implement the `PromotionDialog.tsx` and the logic in `GameController.tsx` to handle pawn promotion.
-11. **End of Game Logic:** Implement logic in `GameController.tsx` to detect checkmate and stalemate, and display the result in `GameInfo.tsx`.
-12. **Styling and Responsiveness:** Apply Tailwind CSS to all components to create a polished and responsive design.
-
-This step-by-step plan will allow us to build the application incrementally and ensure that each part is well-designed and tested.
+11. **Final Polish & Responsiveness:** Refine the UI/UX, improve responsiveness, and add final touches like a favicon, new game button, and last-move highlighting.
+12. **Game Viewer & Replay Mode:** Implement a feature to import and replay games from chess.com. This is a major architectural step that will be broken down into the following sub-steps:
+    *   **Step 12a: State Management Refactor to Zustand:** Replace the `GameController` render-prop pattern with a global Zustand store to manage all game state. This is a prerequisite for all subsequent steps.
+    *   **Step 12b: Chess.com API Service & Game Importer UI:** Build the service to fetch game data from the public chess.com API and create the UI for users to import a game.
+    *   **Step 12c: Core Replay Logic:** Implement the foundational logic in the Zustand store for loading a PGN and stepping through moves programmatically.
+    *   **Step 12d: Replay Controls UI & UX:** Build the UI component with buttons for play, pause, next, previous, etc., to control the game replay.
+    *   **Step 12e: Replay Enhancements:** Add polished features like a progress slider, keyboard shortcuts, game metadata display, and a clickable move history.
+13. **AI Coach Integration (Phase 2):** Once the replay feature is complete, begin work on integrating the AI chat functionality. This will involve a backend service, an LLM API, and a chat interface on the frontend.

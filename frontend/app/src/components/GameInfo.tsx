@@ -1,12 +1,10 @@
-import type { Chess } from 'chess.js';
+import { useGameStore } from '../store/useGameStore';
 import MoveHistory from './MoveHistory';
 
-interface GameInfoProps {
-  game: Chess;
-  onNewGame: () => void;
-}
+const GameInfo = () => {
+  const game = useGameStore(state => state.game);
+  const onNewGame = useGameStore(state => state.resetGame);
 
-const GameInfo = ({ game, onNewGame }: GameInfoProps) => {
   const turn = game.turn() === 'w' ? 'White' : 'Black';
   const isCheck = game.isCheck();
   const isCheckmate = game.isCheckmate();

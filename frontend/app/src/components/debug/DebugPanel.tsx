@@ -1,14 +1,19 @@
+import { useGameStore } from '../../store/useGameStore';
 import FenLoader from './FenLoader';
 import ScenarioPicker from './ScenarioPicker';
-import type { DebugActions } from '../GameController'; // We will define this type in GameController
 
 interface DebugPanelProps {
-  actions: DebugActions;
-  currentFen: string;
   onClose: () => void;
 }
 
-const DebugPanel = ({ actions, currentFen, onClose }: DebugPanelProps) => {
+const DebugPanel = ({ onClose }: DebugPanelProps) => {
+  const actions = useGameStore(state => state.debugActions);
+  const currentFen = useGameStore(state => state.game.fen());
+
+  if (!actions) {
+    return null; // Or some fallback UI, though this should not be rendered in prod.
+  }
+
   return (
     <div className="fixed bottom-4 right-4 bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl z-50 w-full max-w-md p-4">
       <div className="flex justify-between items-center mb-4">

@@ -1,6 +1,5 @@
-import type { Chess } from 'chess.js';
+import { useGameStore } from '../store/useGameStore';
 import Square from './Square';
-import type { LastMove } from './GameController';
 import type {
   SquareColor,
   Square as SquareType,
@@ -11,15 +10,15 @@ import type {
   PieceColor,
 } from '../types/chess';
 
-interface GameBoardProps {
-  game: Chess;
-  selectedSquare: SquareType | null;
-  validMoves: SquareType[];
-  lastMove: LastMove;
-  onSquareClick: (square: SquareType) => void;
-}
+const GameBoard = () => {
+  const {
+    game,
+    selectedSquare,
+    validMoves,
+    lastMove,
+    selectSquare: onSquareClick,
+  } = useGameStore();
 
-const GameBoard = ({ game, selectedSquare, validMoves, lastMove, onSquareClick }: GameBoardProps) => {
   const board = game.board();
 
   const files: ChessFile[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
