@@ -2,13 +2,17 @@ import { useState } from 'react';
 import { Chess } from 'chess.js';
 import type { Square, PieceType, PieceColor } from '../types/chess';
 
+export type LastMove = {
+  from: Square;
+  to: Square;
+} | null;
+
 type PendingPromotion = {
   from: Square;
   to: Square;
   color: PieceColor;
 };
 
-// Define the type for debug actions, which will only be available in dev mode.
 export interface DebugActions {
   loadFen: (fen: string) => void;
   resetGame: () => void;
@@ -22,6 +26,8 @@ interface GameControllerProps {
     selectSquare: (square: Square) => void,
     pendingMove: PendingPromotion | null,
     handlePromotion: (piece: PieceType) => void,
+    lastMove: LastMove,
+    resetGame: () => void,
     debugActions?: DebugActions
   ) => React.ReactNode;
 }
@@ -31,8 +37,16 @@ const GameController = ({ children }: GameControllerProps) => {
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [validMoves, setValidMoves] = useState<Square[]>([]);
   const [pendingMove, setPendingMove] = useState<PendingPromotion | null>(null);
+  const [lastMove, setLastMove] = useState<LastMove>(null);
 
-  // Debug actions are only created in development mode.
+  const resetGame = () => {
+    setGame(new Chess());
+    setSelectedSquare(null);
+    setValidMoves([]);
+    setPendingMove(null);
+    setLastMove(null);
+  };
+
   const debugActions: DebugActions | undefined = import.meta.env.DEV ? {
     loadFen: (fen: string) => {
       try {
@@ -41,23 +55,17 @@ const GameController = ({ children }: GameControllerProps) => {
         setSelectedSquare(null);
         setValidMoves([]);
         setPendingMove(null);
+        setLastMove(null);
       } catch (error) {
         console.error('Invalid FEN:', error);
       }
     },
-    resetGame: () => {
-      setGame(new Chess());
-      setSelectedSquare(null);
-      setValidMoves([]);
-      setPendingMove(null);
-    },
+    resetGame
   } : undefined;
 
   const selectSquare = (square: Square) => {
-    // If a promotion is pending, don't allow other moves
     if (pendingMove) return;
 
-    // If no square is selected, select this square (if it has a piece)
     if (!selectedSquare) {
       const piece = game.get(square);
       if (piece && piece.color === game.turn()) {
@@ -68,25 +76,20 @@ const GameController = ({ children }: GameControllerProps) => {
       return;
     }
 
-    // If clicking the same square, deselect it
     if (selectedSquare === square) {
       setSelectedSquare(null);
       setValidMoves([]);
       return;
     }
 
-    // Try to make a move
     try {
       const piece = game.get(selectedSquare);
 
-      // Check if this would be a promotion move
       if (piece?.type === 'p' && (square.endsWith('1') || square.endsWith('8'))) {
-        // Validate the move is legal
         const moves = game.moves({ square: selectedSquare, verbose: true });
         const isValidMove = moves.some(m => m.to === square);
 
         if (isValidMove) {
-          // Valid promotion - show dialog
           setPendingMove({
             from: selectedSquare,
             to: square,
@@ -98,19 +101,17 @@ const GameController = ({ children }: GameControllerProps) => {
         }
       }
 
-      // Not a promotion, proceed with normal move
       const move = game.move({
         from: selectedSquare,
         to: square
       });
 
       if (move) {
-        // Move was successful, update state
         setGame(new Chess(game.fen()));
+        setLastMove({ from: selectedSquare, to: square });
         setSelectedSquare(null);
         setValidMoves([]);
       } else {
-        // Invalid move, check if clicking another piece of the same color
         const newPiece = game.get(square);
         if (newPiece && newPiece.color === game.turn()) {
           setSelectedSquare(square);
@@ -121,8 +122,7 @@ const GameController = ({ children }: GameControllerProps) => {
           setValidMoves([]);
         }
       }
-    } catch (error) {
-      // Invalid move, deselect
+    } catch {
       setSelectedSquare(null);
       setValidMoves([]);
     }
@@ -136,11 +136,12 @@ const GameController = ({ children }: GameControllerProps) => {
       to: pendingMove.to,
       promotion: piece
     });
-    setGame(new Chess(game.fen())); // Consistent with existing pattern
+    setGame(new Chess(game.fen()));
+    setLastMove({ from: pendingMove.from, to: pendingMove.to });
     setPendingMove(null);
   };
 
-  return <>{children(game, selectedSquare, validMoves, selectSquare, pendingMove, handlePromotion, debugActions)}</>;
+  return <>{children(game, selectedSquare, validMoves, selectSquare, pendingMove, handlePromotion, lastMove, resetGame, debugActions)}</>;
 };
 
 export default GameController;

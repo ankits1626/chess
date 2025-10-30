@@ -1,21 +1,30 @@
 import type { Chess } from 'chess.js';
-import MoveHistory from './MoveHistory'; // Import the new component
+import MoveHistory from './MoveHistory';
 
 interface GameInfoProps {
   game: Chess;
+  onNewGame: () => void;
 }
 
-const GameInfo = ({ game }: GameInfoProps) => {
+const GameInfo = ({ game, onNewGame }: GameInfoProps) => {
   const turn = game.turn() === 'w' ? 'White' : 'Black';
   const isCheck = game.isCheck();
   const isCheckmate = game.isCheckmate();
   const isDraw = game.isDraw();
   const isStalemate = game.isStalemate();
-  const moveHistory = game.history(); // Get move history
+  const moveHistory = game.history();
 
   return (
-    <div className="bg-gray-700 p-6 rounded-lg w-full lg:w-64">
-      <h2 className="text-2xl font-bold mb-4">Game Info</h2>
+    <div className="bg-gray-700 p-6 rounded-lg w-full lg:w-80">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold">Game Info</h2>
+        <button
+          onClick={onNewGame}
+          className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-3 py-1 rounded transition-colors"
+        >
+          New Game
+        </button>
+      </div>
 
       <div className="space-y-2">
         <p><span className="font-semibold">Turn:</span> {turn}</p>
@@ -39,7 +48,6 @@ const GameInfo = ({ game }: GameInfoProps) => {
         )}
       </div>
 
-      {/* Add the MoveHistory component */}
       <MoveHistory moves={moveHistory} />
     </div>
   );

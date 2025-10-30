@@ -1,5 +1,6 @@
 import type { Chess } from 'chess.js';
 import Square from './Square';
+import type { LastMove } from './GameController';
 import type {
   SquareColor,
   Square as SquareType,
@@ -14,10 +15,11 @@ interface GameBoardProps {
   game: Chess;
   selectedSquare: SquareType | null;
   validMoves: SquareType[];
+  lastMove: LastMove;
   onSquareClick: (square: SquareType) => void;
 }
 
-const GameBoard = ({ game, selectedSquare, validMoves, onSquareClick }: GameBoardProps) => {
+const GameBoard = ({ game, selectedSquare, validMoves, lastMove, onSquareClick }: GameBoardProps) => {
   const board = game.board();
 
   const files: ChessFile[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
@@ -74,10 +76,11 @@ const GameBoard = ({ game, selectedSquare, validMoves, onSquareClick }: GameBoar
           <Square
             key={square.name}
             squareColor={square.color}
-            squareName={square.name}
             piece={square.piece}
             isSelected={selectedSquare === square.name}
             isValidMove={validMoves.includes(square.name)}
+            isLastMoveFrom={lastMove?.from === square.name}
+            isLastMoveTo={lastMove?.to === square.name}
             onClick={() => onSquareClick(square.name)}
           />
         ))}

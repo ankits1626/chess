@@ -16,16 +16,17 @@ function App() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-800 text-white p-8">
       <GameController>
-        {(game, selectedSquare, validMoves, selectSquare, pendingMove, handlePromotion, debugActions) => (
+        {(game, selectedSquare, validMoves, selectSquare, pendingMove, handlePromotion, lastMove, resetGame, debugActions) => (
           <>
-            <div className="flex flex-row gap-8 items-center">
+            <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-center">
               <GameBoard
                 game={game}
                 selectedSquare={selectedSquare}
                 validMoves={validMoves}
+                lastMove={lastMove}
                 onSquareClick={selectSquare}
               />
-              <GameInfo game={game} />
+              <GameInfo game={game} onNewGame={resetGame} />
             </div>
 
             {pendingMove && (
