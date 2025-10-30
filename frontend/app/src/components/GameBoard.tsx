@@ -55,9 +55,9 @@ const GameBoard = ({ game, selectedSquare, onSquareClick }: GameBoardProps) => {
   }
 
   return (
-    <div className="relative">
+    <div className="relative w-[min(100vw,calc(100vh-4rem))] h-[min(100vw,calc(100vh-4rem))] mx-auto transition-all duration-300">
       {/* Rank labels (8-1) on the left */}
-      <div className="absolute -left-6 top-0 h-[min(100vw,calc(100vh-4rem))] flex flex-col justify-around text-gray-400 text-sm transition-all duration-300">
+      <div className="absolute -left-6 top-0 h-full flex flex-col justify-around text-gray-400 text-sm transition-all duration-300">
         {ranks
           .slice()
           .reverse()
@@ -68,7 +68,7 @@ const GameBoard = ({ game, selectedSquare, onSquareClick }: GameBoardProps) => {
           ))}
       </div>
 
-      <div className="w-[min(100vw,calc(100vh-4rem))] h-[min(100vw,calc(100vh-4rem))] mx-auto grid grid-cols-8 grid-rows-8 border-2 border-gray-900 transition-all duration-300">
+      <div className="w-full h-full grid grid-cols-8 grid-rows-8 border-2 border-[#759656] transition-all duration-300">
         {squares.map((square) => (
           <Square
             key={square.name}
@@ -82,7 +82,7 @@ const GameBoard = ({ game, selectedSquare, onSquareClick }: GameBoardProps) => {
       </div>
 
       {/* File labels (a-h) at the bottom */}
-      <div className="w-[min(100vw,calc(100vh-4rem))] mx-auto flex justify-around text-gray-400 text-sm mt-2 transition-all duration-300">
+      <div className="absolute -bottom-5 left-0 w-full flex justify-around text-gray-400 text-sm px-2 transition-all duration-300">
         {files.map((file) => (
           <span key={`file-${file}`} className="flex items-center justify-center w-full">
             {file}
