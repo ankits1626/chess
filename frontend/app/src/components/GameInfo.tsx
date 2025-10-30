@@ -1,4 +1,5 @@
 import type { Chess } from 'chess.js';
+import MoveHistory from './MoveHistory'; // Import the new component
 
 interface GameInfoProps {
   game: Chess;
@@ -10,6 +11,7 @@ const GameInfo = ({ game }: GameInfoProps) => {
   const isCheckmate = game.isCheckmate();
   const isDraw = game.isDraw();
   const isStalemate = game.isStalemate();
+  const moveHistory = game.history(); // Get move history
 
   return (
     <div className="bg-gray-700 p-6 rounded-lg w-full lg:w-64">
@@ -36,6 +38,9 @@ const GameInfo = ({ game }: GameInfoProps) => {
           <p className="text-blue-400 font-bold">Draw!</p>
         )}
       </div>
+
+      {/* Add the MoveHistory component */}
+      <MoveHistory moves={moveHistory} />
     </div>
   );
 };

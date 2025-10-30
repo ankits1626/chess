@@ -13,10 +13,11 @@ import type {
 interface GameBoardProps {
   game: Chess;
   selectedSquare: SquareType | null;
+  validMoves: SquareType[];
   onSquareClick: (square: SquareType) => void;
 }
 
-const GameBoard = ({ game, selectedSquare, onSquareClick }: GameBoardProps) => {
+const GameBoard = ({ game, selectedSquare, validMoves, onSquareClick }: GameBoardProps) => {
   const board = game.board();
 
   const files: ChessFile[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
@@ -76,6 +77,7 @@ const GameBoard = ({ game, selectedSquare, onSquareClick }: GameBoardProps) => {
             squareName={square.name}
             piece={square.piece}
             isSelected={selectedSquare === square.name}
+            isValidMove={validMoves.includes(square.name)}
             onClick={() => onSquareClick(square.name)}
           />
         ))}

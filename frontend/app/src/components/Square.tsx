@@ -6,10 +6,11 @@ interface SquareProps {
   squareName: SquareType;
   piece: ChessPiece | null;
   isSelected: boolean;
+  isValidMove: boolean;
   onClick: () => void;
 }
 
-const Square = ({ squareColor, squareName, piece, isSelected, onClick }: SquareProps) => {
+const Square = ({ squareColor, squareName, piece, isSelected, isValidMove, onClick }: SquareProps) => {
   const bgColor = squareColor === 'light'
     ? 'bg-[#e8edd5]'
     : 'bg-[#759656]';
@@ -25,6 +26,14 @@ const Square = ({ squareColor, squareName, piece, isSelected, onClick }: SquareP
       onClick={onClick}
     >
       {piece && <Piece piece={piece} />}
+
+      {/* Valid move indicator */}
+      {isValidMove && (
+        <div className={`
+          absolute rounded-full
+          ${piece ? 'w-full h-full border-4 border-yellow-500/60' : 'w-4 h-4 bg-yellow-500/60'}
+        `} />
+      )}
     </div>
   );
 };

@@ -6,11 +6,12 @@ function App() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-800 text-white p-8">
       <GameController>
-        {(game, selectedSquare, selectSquare) => (
+        {(game, selectedSquare, validMoves, selectSquare) => (
           <div className="flex flex-row gap-8 items-center">
             <GameBoard
               game={game}
               selectedSquare={selectedSquare}
+              validMoves={validMoves}
               onSquareClick={selectSquare}
             />
             <GameInfo game={game} />
