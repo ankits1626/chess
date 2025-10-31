@@ -14,6 +14,8 @@ interface ChessComGamesResponse {
   }>;
 }
 
+export type ChessComGame = ChessComGamesResponse['games'][0];
+
 class RateLimitError extends Error {
   retryAfter?: number;
 

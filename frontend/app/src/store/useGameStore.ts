@@ -1,18 +1,15 @@
 import { create } from 'zustand';
 import { Chess, Move } from 'chess.js';
 import type { Square, PieceType, PieceColor } from '../types/chess';
+import {
+  fetchUserArchives,
+  fetchMonthGames,
+  type ChessComGame,
+} from '../services/chesscomApi';
 
-// Type definitions from the old GameController
-export type LastMove = {
-  from: Square;
-  to: Square;
-} | null;
-
-type PendingPromotion = {
-  from: Square;
-  to: Square;
-  color: PieceColor;
-};
+// Type definitions
+export type LastMove = { from: Square; to: Square } | null;
+type PendingPromotion = { from: Square; to: Square; color: PieceColor };
 
 export interface DebugActions {
   loadFen: (fen: string) => void;
@@ -30,12 +27,19 @@ interface GameState {
 
   // Replay state
   mode: 'live' | 'replay';
-  replayMoves: Move[]; // `Move` type from chess.js
-  replayIndex: number; // -1 for initial position, 0 for first move, etc.
+  replayMoves: Move[];
+  replayIndex: number;
   isAutoplaying: boolean;
   autoplayIntervalId: NodeJS.Timeout | null;
   whitePlayer: string | null;
   blackPlayer: string | null;
+
+  // Multi-game importer state
+  gameArchives: string[] | null;
+  importedGames: ChessComGame[] | null;
+  isGameListLoading: boolean;
+  fetchGamesError: string | null;
+  currentArchiveUrl: string | null;
 
   // Actions
   selectSquare: (square: Square) => void;
@@ -52,6 +56,12 @@ interface GameState {
   toggleAutoplay: () => void;
   startAutoplay: () => void;
   stopAutoplay: () => void;
+
+  // Multi-game importer actions
+  fetchGameArchives: (username: string) => Promise<void>;
+  fetchGamesForArchive: (url: string) => Promise<void>;
+  loadPgnFromGame: (game: ChessComGame) => void;
+  resetGameImporter: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -63,15 +73,21 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastMove: null,
   mode: 'live',
   replayMoves: [],
-  replayIndex: -1, // -1 means initial board state
+  replayIndex: -1,
   isAutoplaying: false,
   autoplayIntervalId: null,
   whitePlayer: null,
   blackPlayer: null,
+  gameArchives: null,
+  importedGames: null,
+  isGameListLoading: false,
+  fetchGamesError: null,
+  currentArchiveUrl: null,
 
   // Actions
   resetGame: () => {
     get().stopAutoplay();
+    get().resetGameImporter();
     set({
       game: new Chess(),
       selectedSquare: null,
@@ -88,55 +104,30 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   loadPgn: (pgn: string) => {
     get().stopAutoplay();
+    get().resetGameImporter();
     try {
-      // Parse player names from PGN header
       const whiteMatch = pgn.match(/\s*\[\s*White\s*"(.*?)"\s*\]\s*/);
       const blackMatch = pgn.match(/\s*\[\s*Black\s*"(.*?)"\s*\]\s*/);
       const whitePlayer = whiteMatch ? whiteMatch[1] : null;
       const blackPlayer = blackMatch ? blackMatch[1] : null;
 
-      // Remove all comments and annotations
-      let cleanedPgn = pgn
-        .replace(/\{[^}]*\}/g, '')  // Remove {comments}
-        .replace(/\([^)]*\)/g, ''); // Remove (variations)
-
-      // Extract move text (everything after headers)
+      let cleanedPgn = pgn.replace(/\{[^}]*\}/g, '').replace(/\([^)]*\)/g, '');
       const moveTextMatch = cleanedPgn.match(/\n\n(.+)$/s);
-      if (!moveTextMatch) {
-        throw new Error('No moves found in PGN');
-      }
-
+      if (!moveTextMatch) throw new Error('No moves found in PGN');
       let moveText = moveTextMatch[1];
 
-      // Extract only the actual chess moves in SAN notation
       const sanMovePattern = /([NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](?:=[NBRQ])?[+#]?|O-O(?:-O)?)/g;
       const sanMoves = moveText.match(sanMovePattern);
+      if (!sanMoves || sanMoves.length === 0) throw new Error('No valid moves found in PGN');
 
-      if (!sanMoves || sanMoves.length === 0) {
-        throw new Error('No valid moves found in PGN');
-      }
-
-      // Replay moves manually to build the move history
       const tempGame = new Chess();
-      const moves: Move[] = [];
+      const moves: Move[] = sanMoves.map(san => {
+        const move = tempGame.move(san.trim());
+        if (!move) throw new Error(`Invalid move: ${san}`);
+        return move;
+      });
 
-      for (let i = 0; i < sanMoves.length; i++) {
-        const san = sanMoves[i].trim();
-        try {
-          const move = tempGame.move(san);
-          if (!move) {
-            throw new Error(`Invalid move: ${san} at position ${i + 1}`);
-          }
-          moves.push(move);
-        } catch (error) {
-          console.error(`Error playing move ${i + 1}: ${san}`, error);
-          throw error;
-        }
-      }
-
-      // Reset to starting position for replay
       const replayGame = new Chess();
-
       set({
         mode: 'replay',
         game: Object.assign(Object.create(Object.getPrototypeOf(replayGame)), replayGame),
@@ -144,102 +135,60 @@ export const useGameStore = create<GameState>((set, get) => ({
         replayIndex: -1,
         whitePlayer,
         blackPlayer,
-
-        // Clear live game state
         selectedSquare: null,
         validMoves: [],
         pendingMove: null,
-        lastMove: null
+        lastMove: null,
       });
     } catch (error) {
       console.error('Failed to load PGN:', error);
-      throw error; // Re-throw for component to handle
+      throw error;
     }
   },
 
   goToMove: (index: number) => {
     const { replayMoves, stopAutoplay } = get();
     stopAutoplay();
-
-    // Ensure index is within bounds
-    if (index < -1 || index >= replayMoves.length) {
-      console.warn(`Attempted to go to invalid move index: ${index}`);
-      return;
-    }
+    if (index < -1 || index >= replayMoves.length) return;
 
     const tempGame = new Chess();
-    // Replay moves up to the specified index
     for (let i = 0; i <= index; i++) {
-      tempGame.move(replayMoves[i].san); // Use .san property for moves
+      tempGame.move(replayMoves[i].san);
     }
 
-    set({
-      game: Object.assign(Object.create(Object.getPrototypeOf(tempGame)), tempGame),
-      replayIndex: index,
-      // Clear live game state when navigating in replay mode
-      selectedSquare: null,
-      validMoves: [],
-      pendingMove: null,
-      lastMove: null,
-    });
+    set({ game: tempGame, replayIndex: index, selectedSquare: null, validMoves: [], pendingMove: null, lastMove: null });
   },
 
   nextMove: () => {
     const { isAutoplaying, stopAutoplay, replayIndex, replayMoves } = get();
-    if (!isAutoplaying) {
-      stopAutoplay();
-    }
+    if (!isAutoplaying) stopAutoplay();
     if (replayIndex < replayMoves.length - 1) {
-      // Manually call the core logic of goToMove without the stopAutoplay side-effect
       const newIndex = replayIndex + 1;
       const tempGame = new Chess();
       for (let i = 0; i <= newIndex; i++) {
         tempGame.move(replayMoves[i].san);
       }
-      set({
-        game: Object.assign(Object.create(Object.getPrototypeOf(tempGame)), tempGame),
-        replayIndex: newIndex,
-        selectedSquare: null,
-        validMoves: [],
-        pendingMove: null,
-        lastMove: null,
-      });
+      set({ game: tempGame, replayIndex: newIndex, selectedSquare: null, validMoves: [], pendingMove: null, lastMove: null });
     }
   },
 
   prevMove: () => {
     const { replayIndex, goToMove } = get();
-    // goToMove already stops autoplay
-    if (replayIndex > -1) {
-      goToMove(replayIndex - 1);
-    }
+    if (replayIndex > -1) goToMove(replayIndex - 1);
   },
 
-  goToFirstMove: () => {
-    get().goToMove(-1); // Go to initial board state
-  },
-
-  goToLastMove: () => {
-    const { replayMoves, goToMove } = get();
-    goToMove(replayMoves.length - 1);
-  },
+  goToFirstMove: () => get().goToMove(-1),
+  goToLastMove: () => get().goToMove(get().replayMoves.length - 1),
 
   toggleAutoplay: () => {
     const { isAutoplaying, stopAutoplay, startAutoplay } = get();
-    if (isAutoplaying) {
-      stopAutoplay();
-    } else {
-      startAutoplay();
-    }
+    if (isAutoplaying) stopAutoplay();
+    else startAutoplay();
   },
 
   startAutoplay: () => {
-    const { replayIndex, replayMoves, nextMove, stopAutoplay } = get();
-
-    if (replayIndex >= replayMoves.length - 1) {
-      return; // Don't start if already at the end
-    }
-
+    const { replayIndex, replayMoves, nextMove } = get();
+    if (replayIndex >= replayMoves.length - 1) return;
     const intervalId = setInterval(() => {
       const { replayIndex: currentIndex, replayMoves: currentMoves, stopAutoplay: currentStop } = get();
       if (currentIndex >= currentMoves.length - 1) {
@@ -248,26 +197,54 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       nextMove();
     }, 1000);
-
     set({ isAutoplaying: true, autoplayIntervalId: intervalId });
   },
 
   stopAutoplay: () => {
     const { autoplayIntervalId } = get();
-    if (autoplayIntervalId) {
-      clearInterval(autoplayIntervalId);
-    }
+    if (autoplayIntervalId) clearInterval(autoplayIntervalId);
     set({ isAutoplaying: false, autoplayIntervalId: null });
+  },
+
+  // Importer Actions
+  fetchGameArchives: async (username: string) => {
+    set({ isGameListLoading: true, fetchGamesError: null, gameArchives: null, importedGames: null, currentArchiveUrl: null });
+    try {
+      const archivesResponse = await fetchUserArchives(username);
+      if (archivesResponse.archives.length === 0) throw new Error(`User "${username}" has no game archives`);
+      const archives = archivesResponse.archives;
+      set({ gameArchives: archives });
+      const latestArchiveUrl = archives[archives.length - 1];
+      await get().fetchGamesForArchive(latestArchiveUrl);
+    } catch (error) {
+      set({ fetchGamesError: error instanceof Error ? error.message : 'Failed to fetch archives', isGameListLoading: false });
+    }
+  },
+
+  fetchGamesForArchive: async (url: string) => {
+    set({ isGameListLoading: true, fetchGamesError: null, currentArchiveUrl: url });
+    try {
+      const gamesResponse = await fetchMonthGames(url);
+      // The API returns games oldest first, so we reverse them to show newest first.
+      const reversedGames = gamesResponse.games.reverse();
+      set({ importedGames: reversedGames, isGameListLoading: false });
+    } catch (error) {
+      set({ fetchGamesError: error instanceof Error ? error.message : 'Failed to fetch games', isGameListLoading: false });
+    }
+  },
+
+  loadPgnFromGame: (game: ChessComGame) => {
+    get().loadPgn(game.pgn);
+  },
+
+  resetGameImporter: () => {
+    set({ gameArchives: null, importedGames: null, isGameListLoading: false, fetchGamesError: null, currentArchiveUrl: null });
   },
 
   selectSquare: (square: Square) => {
     const { game, pendingMove, selectedSquare, mode } = get();
-
-    // Disable clicks in replay mode
     if (mode === 'replay') return;
-
     if (pendingMove) return;
-
     if (!selectedSquare) {
       const piece = game.get(square);
       if (piece && piece.color === game.turn()) {
@@ -276,38 +253,23 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       return;
     }
-
     if (selectedSquare === square) {
       set({ selectedSquare: null, validMoves: [] });
       return;
     }
-
     try {
       const piece = game.get(selectedSquare);
-
       if (piece?.type === 'p' && (square.endsWith('1') || square.endsWith('8'))) {
         const moves = game.moves({ square: selectedSquare, verbose: true });
         const isValidMove = moves.some(m => m.to === square);
-
         if (isValidMove) {
-          set({
-            pendingMove: { from: selectedSquare, to: square, color: piece.color },
-            selectedSquare: null,
-            validMoves: [],
-          });
+          set({ pendingMove: { from: selectedSquare, to: square, color: piece.color }, selectedSquare: null, validMoves: [] });
           return;
         }
       }
-
       const move = game.move({ from: selectedSquare, to: square });
-
       if (move) {
-        set({
-          game: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
-          lastMove: { from: selectedSquare, to: square },
-          selectedSquare: null,
-          validMoves: [],
-        });
+        set({ game: Object.assign(Object.create(Object.getPrototypeOf(game)), game), lastMove: { from: selectedSquare, to: square }, selectedSquare: null, validMoves: [] });
       } else {
         const newPiece = game.get(square);
         if (newPiece && newPiece.color === game.turn()) {
@@ -324,33 +286,20 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   handlePromotion: (piece: PieceType) => {
     const { game, pendingMove, mode } = get();
-    if (mode === 'replay') return; // Disable in replay mode
+    if (mode === 'replay') return;
     if (!pendingMove) return;
-
     game.move({ from: pendingMove.from, to: pendingMove.to, promotion: piece });
-    set({
-      game: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
-      lastMove: { from: pendingMove.from, to: pendingMove.to },
-      pendingMove: null,
-    });
+    set({ game: Object.assign(Object.create(Object.getPrototypeOf(game)), game), lastMove: { from: pendingMove.from, to: pendingMove.to }, pendingMove: null });
   },
 
   // Debug Actions
   debugActions: import.meta.env.DEV ? {
     loadFen: (fen: string) => {
       get().stopAutoplay();
+      get().resetGameImporter();
       try {
         const newGame = new Chess(fen);
-        set({
-          game: newGame,
-          selectedSquare: null,
-          validMoves: [],
-          pendingMove: null,
-          lastMove: null,
-          mode: 'live',
-          replayMoves: [],
-          replayIndex: -1,
-        });
+        set({ game: newGame, selectedSquare: null, validMoves: [], pendingMove: null, lastMove: null, mode: 'live', replayMoves: [], replayIndex: -1, whitePlayer: null, blackPlayer: null });
       } catch (error) {
         console.error('Invalid FEN:', error);
       }
