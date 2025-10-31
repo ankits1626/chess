@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>Chess Coach WebSocket Test</h1>
+    <div>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="sendPing()">Send Ping</button>
+    </div>
+    <div>
+        <h3>Messages:</h3>
+        <pre id="messages"></pre>
+    </div>
+
+    <script>
+        let ws = null;
+        const messages = document.getElementById('messages');
+
+        function connect() {
+            ws = new WebSocket('ws://localhost:8080/ws');
+
+            ws.onopen = () => {
+                log('Connected!');
+            };
+
+            ws.onmessage = (event) => {
+                log('Received: ' + event.data);
+            };
+
+            ws.onclose = () => {
+                log('Disconnected');
+            };
+
+            ws.onerror = (error) => {
+                log('Error: ' + error);
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function sendPing() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const msg = JSON.stringify({ type: 'ping', payload: {} });
+                ws.send(msg);
+                log('Sent: ' + msg);
+            }
+        }
+
+        function log(msg) {
+            messages.textContent += new Date().toISOString() + ' - ' + msg + '\n';
+        }
+    </script>
+</body>
+</html>

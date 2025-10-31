@@ -1,0 +1,23 @@
+### Health Check
+GET http://localhost:8080/health
+Content-Type: application/json
+
+### Root Endpoint
+GET http://localhost:8080/
+Content-Type: application/json
+
+###
+# Future: Create Game (Phase 2)
+# POST http://localhost:8080/api/games
+# Content-Type: application/json
+#
+# {
+#   "pgn": "1. e4 e5 2. Nf3 Nc6"
+# }
+
+###
+# Future: WebSocket Connection Test (Phase 2)
+# @host = localhost:8080
+# GET ws://{{host}}/ws
+# Upgrade: websocket
+# Connection: Upgrade

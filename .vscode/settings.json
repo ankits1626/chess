@@ -1,0 +1,89 @@
+{
+  // Go Extension Settings
+  "go.useLanguageServer": true,
+  "go.lintTool": "golangci-lint",
+  "go.lintOnSave": "workspace",
+  "go.formatTool": "goimports",
+  "go.formatOnSave": true,
+  "go.vetOnSave": "workspace",
+
+  // Organize imports automatically
+  "go.buildOnSave": "off",
+  "go.coverOnSave": false,
+  "go.testOnSave": false,
+
+  // IntelliSense settings
+  "go.autocompleteUnimportedPackages": true,
+  "go.gocodeAutoBuild": false,
+
+  // Gopls (Go Language Server) settings
+  "gopls": {
+    "ui.semanticTokens": true,
+    "ui.completion.usePlaceholders": true,
+    "ui.diagnostic.analyses": {
+      "composites": false,
+      "unusedparams": true,
+      "unusedwrite": true,
+      "useany": true
+    },
+    "ui.codelenses": {
+      "gc_details": true,
+      "generate": true,
+      "test": true,
+      "tidy": true,
+      "upgrade_dependency": true,
+      "vendor": true
+    },
+    "build.directoryFilters": [
+      "-frontend/node_modules",
+      "-frontend/.next",
+      "-backend/tmp",
+      "-backend/vendor"
+    ]
+  },
+
+  // Editor settings for Go files
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4,
+    "editor.rulers": [100],
+    "editor.bracketPairColorization.enabled": true
+  },
+
+  "[go.mod]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+
+  // File associations
+  "files.associations": {
+    "*.tmpl": "html",
+    "*.toml": "toml"
+  },
+
+  // File exclusions (keep explorer clean)
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/tmp": true
+  },
+
+  // Search exclusions
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/tmp": true,
+    "**/.next": true,
+    "**/dist": true,
+    "**/vendor": true
+  },
+
+  // Terminal settings
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "terminal.integrated.defaultProfile.osx": "zsh"
+}
