@@ -32,6 +32,10 @@ interface GameState {
   mode: 'live' | 'replay';
   replayMoves: Move[]; // `Move` type from chess.js
   replayIndex: number; // -1 for initial position, 0 for first move, etc.
+  isAutoplaying: boolean;
+  autoplayIntervalId: NodeJS.Timeout | null;
+  whitePlayer: string | null;
+  blackPlayer: string | null;
 
   // Actions
   selectSquare: (square: Square) => void;
@@ -39,12 +43,15 @@ interface GameState {
   resetGame: () => void;
   loadPgn: (pgn: string) => void;
 
-  // New Replay Actions
+  // Replay Actions
   goToMove: (index: number) => void;
   nextMove: () => void;
   prevMove: () => void;
   goToFirstMove: () => void;
   goToLastMove: () => void;
+  toggleAutoplay: () => void;
+  startAutoplay: () => void;
+  stopAutoplay: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -57,9 +64,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   mode: 'live',
   replayMoves: [],
   replayIndex: -1, // -1 means initial board state
+  isAutoplaying: false,
+  autoplayIntervalId: null,
+  whitePlayer: null,
+  blackPlayer: null,
 
   // Actions
   resetGame: () => {
+    get().stopAutoplay();
     set({
       game: new Chess(),
       selectedSquare: null,
@@ -69,11 +81,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       mode: 'live',
       replayMoves: [],
       replayIndex: -1,
+      whitePlayer: null,
+      blackPlayer: null,
     });
   },
 
   loadPgn: (pgn: string) => {
+    get().stopAutoplay();
     try {
+      // Parse player names from PGN header
+      const whiteMatch = pgn.match(/\s*\[\s*White\s*"(.*?)"\s*\]\s*/);
+      const blackMatch = pgn.match(/\s*\[\s*Black\s*"(.*?)"\s*\]\s*/);
+      const whitePlayer = whiteMatch ? whiteMatch[1] : null;
+      const blackPlayer = blackMatch ? blackMatch[1] : null;
+
       // Remove all comments and annotations
       let cleanedPgn = pgn
         .replace(/\{[^}]*\}/g, '')  // Remove {comments}
@@ -88,15 +109,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       let moveText = moveTextMatch[1];
 
       // Extract only the actual chess moves in SAN notation
-      // This regex matches: Nf3, e4, O-O, O-O-O, Bxf3+, exd5#, e8=Q, etc.
       const sanMovePattern = /([NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](?:=[NBRQ])?[+#]?|O-O(?:-O)?)/g;
       const sanMoves = moveText.match(sanMovePattern);
 
       if (!sanMoves || sanMoves.length === 0) {
         throw new Error('No valid moves found in PGN');
       }
-
-      console.log(`Extracted ${sanMoves.length} moves from PGN`);
 
       // Replay moves manually to build the move history
       const tempGame = new Chess();
@@ -107,8 +125,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         try {
           const move = tempGame.move(san);
           if (!move) {
-            console.error(`Failed to play move ${i + 1}: ${san}`);
-            console.error('Current position:', tempGame.fen());
             throw new Error(`Invalid move: ${san} at position ${i + 1}`);
           }
           moves.push(move);
@@ -118,8 +134,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       }
 
-      console.log(`Successfully loaded ${moves.length} moves`);
-
       // Reset to starting position for replay
       const replayGame = new Chess();
 
@@ -128,6 +142,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         game: Object.assign(Object.create(Object.getPrototypeOf(replayGame)), replayGame),
         replayMoves: moves,
         replayIndex: -1,
+        whitePlayer,
+        blackPlayer,
 
         // Clear live game state
         selectedSquare: null,
@@ -142,7 +158,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   goToMove: (index: number) => {
-    const { replayMoves } = get();
+    const { replayMoves, stopAutoplay } = get();
+    stopAutoplay();
 
     // Ensure index is within bounds
     if (index < -1 || index >= replayMoves.length) {
@@ -168,14 +185,31 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   nextMove: () => {
-    const { replayIndex, replayMoves, goToMove } = get();
+    const { isAutoplaying, stopAutoplay, replayIndex, replayMoves } = get();
+    if (!isAutoplaying) {
+      stopAutoplay();
+    }
     if (replayIndex < replayMoves.length - 1) {
-      goToMove(replayIndex + 1);
+      // Manually call the core logic of goToMove without the stopAutoplay side-effect
+      const newIndex = replayIndex + 1;
+      const tempGame = new Chess();
+      for (let i = 0; i <= newIndex; i++) {
+        tempGame.move(replayMoves[i].san);
+      }
+      set({
+        game: Object.assign(Object.create(Object.getPrototypeOf(tempGame)), tempGame),
+        replayIndex: newIndex,
+        selectedSquare: null,
+        validMoves: [],
+        pendingMove: null,
+        lastMove: null,
+      });
     }
   },
 
   prevMove: () => {
     const { replayIndex, goToMove } = get();
+    // goToMove already stops autoplay
     if (replayIndex > -1) {
       goToMove(replayIndex - 1);
     }
@@ -188,6 +222,42 @@ export const useGameStore = create<GameState>((set, get) => ({
   goToLastMove: () => {
     const { replayMoves, goToMove } = get();
     goToMove(replayMoves.length - 1);
+  },
+
+  toggleAutoplay: () => {
+    const { isAutoplaying, stopAutoplay, startAutoplay } = get();
+    if (isAutoplaying) {
+      stopAutoplay();
+    } else {
+      startAutoplay();
+    }
+  },
+
+  startAutoplay: () => {
+    const { replayIndex, replayMoves, nextMove, stopAutoplay } = get();
+
+    if (replayIndex >= replayMoves.length - 1) {
+      return; // Don't start if already at the end
+    }
+
+    const intervalId = setInterval(() => {
+      const { replayIndex: currentIndex, replayMoves: currentMoves, stopAutoplay: currentStop } = get();
+      if (currentIndex >= currentMoves.length - 1) {
+        currentStop();
+        return;
+      }
+      nextMove();
+    }, 1000);
+
+    set({ isAutoplaying: true, autoplayIntervalId: intervalId });
+  },
+
+  stopAutoplay: () => {
+    const { autoplayIntervalId } = get();
+    if (autoplayIntervalId) {
+      clearInterval(autoplayIntervalId);
+    }
+    set({ isAutoplaying: false, autoplayIntervalId: null });
   },
 
   selectSquare: (square: Square) => {
@@ -268,6 +338,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   // Debug Actions
   debugActions: import.meta.env.DEV ? {
     loadFen: (fen: string) => {
+      get().stopAutoplay();
       try {
         const newGame = new Chess(fen);
         set({

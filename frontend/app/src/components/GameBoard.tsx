@@ -17,6 +17,7 @@ const GameBoard = () => {
     validMoves,
     lastMove,
     selectSquare: onSquareClick,
+    mode,
   } = useGameStore();
 
   const board = game.board();
@@ -56,8 +57,15 @@ const GameBoard = () => {
     }
   }
 
+  // Calculate board size based on mode
+  // In replay mode: subtract space for player names (2 * 3rem), gaps (2 * 0.5rem), padding (4rem), file labels (1.5rem)
+  // Total: ~14rem to subtract in replay mode
+  const boardSize = mode === 'replay'
+    ? 'w-[min(90vw,calc(100vh-16rem))] h-[min(90vw,calc(100vh-16rem))]'
+    : 'w-[min(90vw,calc(100vh-8rem))] h-[min(90vw,calc(100vh-8rem))]';
+
   return (
-    <div className="relative w-[min(100vw,calc(100vh-4rem))] h-[min(100vw,calc(100vh-4rem))] mx-auto transition-all duration-300">
+    <div className={`relative ${boardSize} mx-auto transition-all duration-300`}>
       {/* Rank labels (8-1) on the left */}
       <div className="absolute -left-6 top-0 h-full flex flex-col justify-around text-gray-400 text-sm transition-all duration-300">
         {ranks
