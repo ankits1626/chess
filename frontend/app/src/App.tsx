@@ -3,6 +3,7 @@ import { useGameStore } from './store/useGameStore';
 import GameBoard from './components/GameBoard';
 import GameInfo from './components/GameInfo';
 import PromotionDialog from './components/PromotionDialog';
+import GameImporter from './components/GameImporter';
 import { useDebugPanel } from './hooks/useDebugPanel';
 
 const DebugPanel = import.meta.env.DEV
@@ -19,6 +20,7 @@ function App() {
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-start">
         <GameBoard />
         <GameInfo />
+        <GameImporter />
       </div>
 
       {pendingMove && (
