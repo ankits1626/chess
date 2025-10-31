@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useGameStore } from '../store/useGameStore';
+import { useGameStore } from '@/store/useGameStore';
 import GameList from './GameList';
 import ArchivePaginator from './ArchivePaginator';
 

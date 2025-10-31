@@ -1,4 +1,4 @@
-import { scenarios } from '../../constants/debugScenarios';
+import { scenarios } from '@/constants/debugScenarios';
 
 interface ScenarioPickerProps {
   onSelect: (fen: string) => void;

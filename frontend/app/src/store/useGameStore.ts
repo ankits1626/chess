@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { Chess, Move } from 'chess.js';
-import type { Square, PieceType, PieceColor } from '../types/chess';
+import type { Square, PieceType, PieceColor } from '@/types/chess';
 import {
   fetchUserArchives,
   fetchMonthGames,
   type ChessComGame,
-} from '../services/chesscomApi';
+} from '@/services/chesscomApi';
 
 // Type definitions
 export type LastMove = { from: Square; to: Square } | null;

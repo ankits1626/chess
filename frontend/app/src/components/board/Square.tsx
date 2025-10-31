@@ -1,4 +1,4 @@
-import type { SquareColor, ChessPiece } from '../types/chess';
+import type { SquareColor, ChessPiece } from '@/types/chess';
 import Piece from './Piece';
 
 interface SquareProps {

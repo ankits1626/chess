@@ -1,16 +1,16 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { useGameStore } from './store/useGameStore';
-import GameBoard from './components/GameBoard';
-import GameInfo from './components/GameInfo';
-import PromotionDialog from './components/PromotionDialog';
-import GameImporter from './components/GameImporter';
-import ReplayControls from './components/ReplayControls';
-import MoveList from './components/MoveList';
-import PlayerDisplay from './components/PlayerDisplay';
-import { useDebugPanel } from './hooks/useDebugPanel';
+import { useGameStore } from '@/store/useGameStore';
+import GameBoard from '@/components/board/GameBoard';
+import GameInfo from '@/components/game/GameInfo';
+import PromotionDialog from '@/components/game/PromotionDialog';
+import GameImporter from '@/components/importer/GameImporter';
+import ReplayControls from '@/components/replay/ReplayControls';
+import MoveList from '@/components/replay/MoveList';
+import PlayerDisplay from '@/components/replay/PlayerDisplay';
+import { useDebugPanel } from '@/hooks/useDebugPanel';
 
 const DebugPanel = import.meta.env.DEV
-  ? lazy(() => import('./components/debug/DebugPanel'))
+  ? lazy(() => import('@/components/debug/DebugPanel'))
   : null;
 
 function App() {
@@ -74,40 +74,42 @@ function App() {
   }, [mode, isFirstMove, isLastMove, prevMove, nextMove, toggleAutoplay, goToFirstMove, goToLastMove]);
 
   return (
-    <div className="min-h-screen bg-gray-800 text-white p-8 overflow-auto">
-      <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-start justify-center min-h-full">
-        <div className="flex flex-col gap-2 items-center pb-8">
-          {mode === 'replay' && <PlayerDisplay name={blackPlayer} />}
-          <GameBoard />
-          {mode === 'replay' && <PlayerDisplay name={whitePlayer} />}
-        </div>
-        <div className="flex flex-col gap-4 w-full lg:w-80">
-          <GameInfo />
-          <GameImporter />
-          {mode === 'replay' && replayMoves.length > 0 && (
-            <>
-              <MoveList
-                moves={replayMoves}
-                currentMoveIndex={replayIndex}
-                onMoveClick={goToMove}
-              />
-              <ReplayControls
-                isFirstMove={isFirstMove}
-                isLastMove={isLastMove}
-                isAutoplaying={isAutoplaying}
-                onGoToFirst={goToFirstMove}
-                onPrevious={prevMove}
-                onToggleAutoplay={toggleAutoplay}
-                onNext={nextMove}
-                onGoToLast={goToLastMove}
-              />
-              {replayIndex >= 0 && (
-                <div className="text-center text-sm text-gray-400 mt-2">
-                  Move {replayIndex + 1} of {replayMoves.length}
-                </div>
-              )}
-            </>
-          )}
+    <div className="min-h-screen bg-gray-800 text-white p-4 sm:p-6 lg:p-8">
+      <div className="max-w-[1600px] mx-auto h-full">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-start lg:items-center justify-center min-h-[calc(100vh-2rem)] sm:min-h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-4rem)]">
+          <div className="flex flex-col gap-2 items-center w-full lg:w-auto">
+            {mode === 'replay' && <PlayerDisplay name={blackPlayer} />}
+            <GameBoard />
+            {mode === 'replay' && <PlayerDisplay name={whitePlayer} />}
+          </div>
+          <div className="flex flex-col gap-4 w-full lg:w-80 pb-8 lg:pb-0">
+            <GameInfo />
+            <GameImporter />
+            {mode === 'replay' && replayMoves.length > 0 && (
+              <>
+                <MoveList
+                  moves={replayMoves}
+                  currentMoveIndex={replayIndex}
+                  onMoveClick={goToMove}
+                />
+                <ReplayControls
+                  isFirstMove={isFirstMove}
+                  isLastMove={isLastMove}
+                  isAutoplaying={isAutoplaying}
+                  onGoToFirst={goToFirstMove}
+                  onPrevious={prevMove}
+                  onToggleAutoplay={toggleAutoplay}
+                  onNext={nextMove}
+                  onGoToLast={goToLastMove}
+                />
+                {replayIndex >= 0 && (
+                  <div className="text-center text-sm text-gray-400 mt-2">
+                    Move {replayIndex + 1} of {replayMoves.length}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 

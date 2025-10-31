@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import type { ChessComGame } from '../services/chesscomApi';
+import type { ChessComGame } from '@/services/chesscomApi';
 
 interface GameListItemProps {
   game: ChessComGame;

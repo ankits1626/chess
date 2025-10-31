@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Chess } from 'chess.js';
-import type { Square, PieceType, PieceColor } from '../types/chess';
+import type { Square, PieceType, PieceColor } from '@/types/chess';
 
 export type LastMove = {
   from: Square;

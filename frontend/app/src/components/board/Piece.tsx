@@ -1,4 +1,4 @@
-import type { ChessPiece } from '../types/chess';
+import type { ChessPiece } from '@/types/chess';
 
 interface PieceProps {
   piece: ChessPiece;

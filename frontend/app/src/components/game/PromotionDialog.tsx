@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import type { PieceType, PieceColor } from '../types/chess';
-import Piece from './Piece';
+import type { PieceType, PieceColor } from '@/types/chess';
+import Piece from '@/components/board/Piece';
 
 interface PromotionDialogProps {
   color: PieceColor;

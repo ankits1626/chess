@@ -1,4 +1,4 @@
-import { useGameStore } from '../store/useGameStore';
+import { useGameStore } from '@/store/useGameStore';
 import Square from './Square';
 import type {
   SquareColor,
@@ -8,7 +8,7 @@ import type {
   ChessPiece,
   PieceType,
   PieceColor,
-} from '../types/chess';
+} from '@/types/chess';
 
 const GameBoard = () => {
   const {

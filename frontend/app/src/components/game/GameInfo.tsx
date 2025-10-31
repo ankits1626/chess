@@ -1,4 +1,4 @@
-import { useGameStore } from '../store/useGameStore';
+import { useGameStore } from '@/store/useGameStore';
 import MoveHistory from './MoveHistory';
 
 const GameInfo = () => {
