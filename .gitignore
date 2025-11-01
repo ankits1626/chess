@@ -55,3 +55,26 @@ ENV/
 pnpm-lock.yaml
 yarn.lock
 package-lock.json
+
+# Go
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Air temporary files
+backend/tmp/
+
+# Vendor directory (if using vendoring)
+backend/vendor/
