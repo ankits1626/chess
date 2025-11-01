@@ -81,3 +81,9 @@ backend/vendor/
 
 # Swagger generated docs
 backend/docs/
+
+
+# Docker
+*.env
+.env.local
+docker-compose.override.yml

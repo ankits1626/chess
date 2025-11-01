@@ -7,15 +7,14 @@ import (
 	"net/http"
 
 	"github.com/ankits1626/chess-coach-backend/internal/config"
+	"github.com/ankits1626/chess-coach-backend/internal/database"
 	"github.com/ankits1626/chess-coach-backend/internal/router"
 	"github.com/gin-gonic/gin"
 )
 
 // Server handles HTTP server start/stop.
 type Server interface {
-	// Start begins listening for HTTP requests.
 	Start() error
-	// Shutdown gracefully shuts down the server.
 	Shutdown(ctx context.Context) error
 }
 
@@ -23,12 +22,13 @@ type Server interface {
 type server struct {
 	httpServer *http.Server
 	config     *config.Config
+	db         *database.DB
 }
 
 // New creates a new Server with given config.
-func New(cfg *config.Config) Server {
+func New(cfg *config.Config, db *database.DB) Server {
 	gin.SetMode(cfg.GinMode)
-	r := router.Setup()
+	r := router.Setup(db)
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
@@ -38,6 +38,7 @@ func New(cfg *config.Config) Server {
 	return &server{
 		httpServer: httpServer,
 		config:     cfg,
+		db:         db,
 	}
 }
 

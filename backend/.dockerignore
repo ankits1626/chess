@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+project-docs/
+*.md
+!README.md
+
+# Tests
+*_test.go
+
+# Temporary files
+tmp/
+*.tmp
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Dependencies (will download in container)
+vendor/
+
+# OS
+.DS_Store
+
+# Generated files (will regenerate)
+internal/database/*.go
+docs/
+
+# Database
+*.db
+*.sqlite

@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - /app/tmp # Exclude tmp dir
+    environment:
+      - GIN_MODE=debug
+    command: air

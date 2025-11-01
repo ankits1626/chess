@@ -1,54 +1,44 @@
+// @title Chess Coach API
+// @version 1.0
+// @description API for chess game analysis and coaching
+// @host localhost:8080
+// @BasePath /api/v1
+
 // Package main bootstraps the Chess Coach API.
 package main
 
 import (
 	"context"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
+	"github.com/ankits1626/chess-coach-backend/internal/app"
 	"github.com/ankits1626/chess-coach-backend/internal/config"
-	"github.com/ankits1626/chess-coach-backend/internal/server"
+	"github.com/ankits1626/chess-coach-backend/internal/database"
+	"github.com/ankits1626/chess-coach-backend/internal/logger"
 )
 
-// @title Chess Coach API
-// @version 1.0
-// @description API for chess game analysis and coaching
-// @host localhost:8080
-// @BasePath /api/v1
-// main starts server with graceful shutdown.
 func main() {
 	// Load configuration
 	cfg := config.Load()
 
-	// Create server
-	srv := server.New(cfg)
+	// Initialize logger
+	appLogger := logger.NewStdLogger()
 
-	// Start server in goroutine
-	go func() {
-		if err := srv.Start(); err != nil {
-			log.Fatalf("Failed to start server: %v", err)
-		}
-	}()
-
-	log.Printf("Server started on port %s", cfg.Port)
-
-	// Wait for interrupt signal for graceful shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	log.Println("Shutting down server...")
-
-	// Graceful shutdown with 5-second timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+	// Connect to database
+	ctx := context.Background()
+	db, err := database.NewDB(ctx, cfg.DSN())
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	log.Println("Server exited")
+	// Create and run application
+	application := app.New(cfg, db, appLogger)
+	defer application.Close()
+
+	appLogger.Info("Database connected successfully")
+
+	// Run application (blocks until shutdown)
+	if err := application.Run(ctx); err != nil {
+		log.Fatalf("Application error: %v", err)
+	}
 }
