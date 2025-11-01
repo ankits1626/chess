@@ -78,3 +78,6 @@ backend/tmp/
 
 # Vendor directory (if using vendoring)
 backend/vendor/
+
+# Swagger generated docs
+backend/docs/

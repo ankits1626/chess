@@ -13,6 +13,11 @@ import (
 	"github.com/ankits1626/chess-coach-backend/internal/server"
 )
 
+// @title Chess Coach API
+// @version 1.0
+// @description API for chess game analysis and coaching
+// @host localhost:8080
+// @BasePath /api/v1
 // main starts server with graceful shutdown.
 func main() {
 	// Load configuration

@@ -4,8 +4,12 @@ package router
 import (
 	"net/http"
 
-	"github.com/ankits1626/chess-coach-backend/internal/router/v1"
+	v1 "github.com/ankits1626/chess-coach-backend/internal/router/v1"
 	"github.com/gin-gonic/gin"
+
+	_ "github.com/ankits1626/chess-coach-backend/docs"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Setup creates configured Gin router.
@@ -14,6 +18,9 @@ func Setup() *gin.Engine {
 
 	// Register v1 API routes
 	v1.RegisterRoutes(r)
+
+	// Swagger UI
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Root endpoint
 	r.GET("/", rootHandler)
