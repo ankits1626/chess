@@ -95,6 +95,57 @@ This directory contains all project documentation in chronological order.
 
 ---
 
+### Phase 5: Database & Game Implementation
+
+**[Step 12-21: Database & Game Features](./REORGANIZATION-SUMMARY.md)**
+
+- Docker setup and database integration
+- ORM/validation comparison
+- Package reorganization
+- Game and move handler implementation
+- Status: ✅ Complete
+
+---
+
+### Phase 6: Chess Engine & Real-Time
+
+**[Step 22: Chess Engine Integration](./step-22-chess-engine-integration.md)**
+
+- Stockfish integration guide
+- UCI protocol implementation
+- Computer opponent setup
+- Status: ✅ Complete
+
+**[Step 23: WebSocket Architecture](./step-23-websocket-architecture.md)**
+
+- Real-time gameplay design
+- WebSocket hub pattern
+- Multiplayer support
+- Status: 📋 Planning Document
+
+**[Architecture Decision: REST vs WebSocket](./architecture-decision-rest-vs-websocket.md)**
+
+- Comparative analysis of approaches
+- Multiplayer considerations
+- AI coach requirements
+- Status: ✅ Reference Document
+
+---
+
+### Phase 7: Technology Evaluation
+
+**[Step 24: Backend Language Comparison](./step-24-backend-language-comparison.md)**
+
+- Go vs Rust comprehensive analysis
+- Performance benchmarks
+- Learning curve comparison
+- Chess-specific ecosystem evaluation
+- Migration cost analysis
+- **Recommendation: Continue with Go**
+- Status: ✅ Complete
+
+---
+
 ## Quick Navigation
 
 ### For New Developers
@@ -149,13 +200,17 @@ Examples:
 
 ## Key Decisions Made
 
-1. **Framework:** Gin (most popular, beginner-friendly)
-2. **API Version:** v1 with `/api/v1` prefix
-3. **Documentation:** Swagger/OpenAPI
-4. **Architecture:** SOLID principles throughout
-5. **Testing:** Minimum 80% coverage
-6. **Doc Style:** Crisp, one-line descriptions
-7. **Hot Reload:** Air for development
+1. **Language:** Go 1.25.3 (evaluated vs Rust - see Step 24)
+2. **Framework:** Gin (most popular, beginner-friendly)
+3. **API Version:** v1 with `/api/v1` prefix
+4. **Documentation:** Swagger/OpenAPI
+5. **Architecture:** SOLID principles throughout
+6. **Database:** PostgreSQL with pgx driver
+7. **Chess Engine:** Stockfish via UCI protocol
+8. **Real-time:** WebSocket for multiplayer (planned)
+9. **Testing:** Minimum 80% coverage
+10. **Doc Style:** Crisp, one-line descriptions
+11. **Hot Reload:** Air for development
 
 ---
 
@@ -182,6 +237,6 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2025-11-01
-**Current Step:** 11
-**Next Step:** 12 (Database Setup)
+**Last Updated:** 2025-11-02
+**Current Step:** 24
+**Next Step:** 25 (WebSocket Implementation or Advanced Features)

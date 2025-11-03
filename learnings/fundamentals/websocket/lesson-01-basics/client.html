@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lesson 1 - WebSocket Test Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .status-bar {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-connect {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-connect:hover:not(:disabled) {
+            background: #218838;
+        }
+
+        .btn-disconnect {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-disconnect:hover:not(:disabled) {
+            background: #c82333;
+        }
+
+        .btn-clear {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-clear:hover:not(:disabled) {
+            background: #5a6268;
+        }
+
+        .message-section {
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .message-type-selector {
+            margin-bottom: 15px;
+        }
+
+        .message-type-selector label {
+            font-weight: 600;
+            margin-right: 10px;
+            color: #495057;
+        }
+
+        .message-type-selector select {
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .message-type-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .file-upload {
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 2px dashed #e9ecef;
+            border-radius: 8px;
+            text-align: center;
+            background: #f8f9fa;
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .file-upload label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .file-upload label:hover {
+            background: #5568d3;
+        }
+
+        .file-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        #messageInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-send {
+            background: #667eea;
+            color: white;
+            padding: 10px 30px;
+        }
+
+        .btn-send:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .quick-messages {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .quick-messages button {
+            background: #e9ecef;
+            color: #495057;
+            padding: 8px 15px;
+            font-size: 13px;
+        }
+
+        .quick-messages button:hover:not(:disabled) {
+            background: #dee2e6;
+        }
+
+        .messages-container {
+            border-top: 1px solid #e9ecef;
+            padding-top: 15px;
+        }
+
+        .messages-label {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        #messages {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .message {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            line-height: 1.4;
+        }
+
+        .message-sent {
+            background: #d1ecf1;
+            border-left: 3px solid #0c5460;
+        }
+
+        .message-received {
+            background: #d4edda;
+            border-left: 3px solid #155724;
+        }
+
+        .message-system {
+            background: #fff3cd;
+            border-left: 3px solid #856404;
+        }
+
+        .message-error {
+            background: #f8d7da;
+            border-left: 3px solid #721c24;
+        }
+
+        .timestamp {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-right: 8px;
+        }
+
+        .stats {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 WebSocket Test Client</h1>
+            <p>Lesson 1: Basic Connection & Echo Server</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div id="urlDisplay">ws://localhost:8080/ws</div>
+        </div>
+
+        <div class="controls">
+            <button id="connectBtn" class="btn-connect" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" class="btn-disconnect" onclick="disconnect()" disabled>Disconnect</button>
+            <button class="btn-clear" onclick="clearMessages()">Clear Messages</button>
+        </div>
+
+        <div class="message-section">
+            <div class="message-type-selector">
+                <label for="messageType">Message Type:</label>
+                <select id="messageType" disabled onchange="handleMessageTypeChange()">
+                    <option value="text">Text Message</option>
+                    <option value="binary">Binary Message</option>
+                    <option value="json">JSON Message</option>
+                    <option value="image">Image File</option>
+                    <option value="ping">Ping (manual)</option>
+                </select>
+            </div>
+
+            <div class="file-upload" id="fileUpload" style="display: none;">
+                <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+                <label for="fileInput">📁 Choose Image File</label>
+                <div class="file-info" id="fileInfo">No file selected</div>
+                <button class="btn-send" onclick="sendImageFile()" id="sendFileBtn" disabled style="margin-top: 10px;">Send Image</button>
+            </div>
+
+            <div class="input-group" id="textInput">
+                <input
+                    type="text"
+                    id="messageInput"
+                    placeholder="Type your message here..."
+                    disabled
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button id="sendBtn" class="btn-send" onclick="sendMessage()" disabled>Send</button>
+            </div>
+
+            <div class="quick-messages">
+                <button onclick="sendQuickMessage('Hello WebSocket!')" disabled class="quick-btn">👋 Hello</button>
+                <button onclick="sendQuickMessage('How are you?')" disabled class="quick-btn">❓ Question</button>
+                <button onclick="sendQuickMessage('This is a test message')" disabled class="quick-btn">🧪 Test</button>
+                <button onclick="sendQuickMessage('🎮 Ready to play chess!')" disabled class="quick-btn">♟️ Chess</button>
+                <button onclick="sendBinaryTest()" disabled class="quick-btn">📦 Binary</button>
+                <button onclick="sendJSONTest()" disabled class="quick-btn">📋 JSON</button>
+            </div>
+
+            <div class="messages-container">
+                <div class="messages-label">📨 Messages</div>
+                <div id="messages"></div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="sentCount">0</div>
+                <div class="stat-label">Messages Sent</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="receivedCount">0</div>
+                <div class="stat-label">Messages Received</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="connectionTime">00:00</div>
+                <div class="stat-label">Connected Time</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let sentCount = 0;
+        let receivedCount = 0;
+        let connectionStartTime = null;
+        let timerInterval = null;
+
+        function connect() {
+            addMessage('Connecting to WebSocket server...', 'system');
+
+            try {
+                ws = new WebSocket('ws://localhost:8080/ws');
+
+                ws.onopen = () => {
+                    addMessage('✅ Connected to server!', 'system');
+                    updateConnectionStatus(true);
+                    connectionStartTime = Date.now();
+                    startTimer();
+                };
+
+                ws.onmessage = (event) => {
+                    receivedCount++;
+                    updateStats();
+
+                    // Handle different message types
+                    if (event.data instanceof Blob) {
+                        // Binary message as Blob
+                        handleBinaryMessage(event.data);
+                    } else if (event.data instanceof ArrayBuffer) {
+                        // Binary message as ArrayBuffer
+                        handleBinaryMessage(new Blob([event.data]));
+                    } else {
+                        // Text message
+                        try {
+                            // Try to parse as JSON
+                            const parsed = JSON.parse(event.data);
+                            addMessage(`[JSON] ${JSON.stringify(parsed, null, 2)}`, 'received');
+                        } catch {
+                            // Regular text message
+                            addMessage(`[TEXT] ${event.data}`, 'received');
+                        }
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    addMessage(`❌ WebSocket error occurred`, 'error');
+                    console.error('WebSocket error:', error);
+                };
+
+                ws.onclose = () => {
+                    addMessage('🔌 Disconnected from server', 'system');
+                    updateConnectionStatus(false);
+                    stopTimer();
+                };
+
+            } catch (error) {
+                addMessage(`❌ Failed to connect: ${error.message}`, 'error');
+                updateConnectionStatus(false);
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            const messageType = document.getElementById('messageType').value;
+
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                try {
+                    switch(messageType) {
+                        case 'text':
+                            ws.send(message);
+                            addMessage(`[TEXT] ${message}`, 'sent');
+                            break;
+
+                        case 'binary':
+                            // Convert string to binary (Uint8Array)
+                            const encoder = new TextEncoder();
+                            const binaryData = encoder.encode(message);
+                            ws.send(binaryData.buffer);
+                            addMessage(`[BINARY] ${message} (${binaryData.length} bytes)`, 'sent');
+                            break;
+
+                        case 'json':
+                            // Send as JSON
+                            const jsonData = {
+                                type: 'message',
+                                content: message,
+                                timestamp: new Date().toISOString()
+                            };
+                            ws.send(JSON.stringify(jsonData));
+                            addMessage(`[JSON] ${JSON.stringify(jsonData, null, 2)}`, 'sent');
+                            break;
+
+                        case 'ping':
+                            // Note: Browser WebSocket API doesn't expose manual ping
+                            // But we can send a text message labeled as ping
+                            ws.send('PING');
+                            addMessage(`[PING] Manual ping sent`, 'sent');
+                            break;
+                    }
+
+                    sentCount++;
+                    updateStats();
+                    input.value = '';
+                    input.focus();
+                } catch (error) {
+                    addMessage(`Error sending message: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        function sendQuickMessage(message) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+                sentCount++;
+                updateStats();
+                addMessage(`[TEXT] ${message}`, 'sent');
+            }
+        }
+
+        function sendBinaryTest() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Create a sample binary message
+                const data = new Uint8Array([72, 101, 108, 108, 111, 33]); // "Hello!"
+                ws.send(data.buffer);
+                sentCount++;
+                updateStats();
+                addMessage(`[BINARY] Sent bytes: [${Array.from(data).join(', ')}] = "Hello!"`, 'sent');
+            }
+        }
+
+        function sendJSONTest() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const jsonData = {
+                    type: 'chess.move',
+                    gameId: '12345',
+                    move: 'e2e4',
+                    timestamp: Date.now()
+                };
+                ws.send(JSON.stringify(jsonData));
+                sentCount++;
+                updateStats();
+                addMessage(`[JSON] ${JSON.stringify(jsonData, null, 2)}`, 'sent');
+            }
+        }
+
+        let selectedFile = null;
+
+        function handleBinaryMessage(blob) {
+            // Check if it's an image by trying to detect image MIME type
+            blob.arrayBuffer().then(buffer => {
+                const bytes = new Uint8Array(buffer);
+                const mimeType = detectImageType(bytes);
+
+                if (mimeType) {
+                    // It's an image! Display it
+                    const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
+                    addMessage(`[IMAGE] Received image (${sizeMB} MB, ${mimeType})`, 'received');
+
+                    // Create image element
+                    const img = document.createElement('img');
+                    const url = URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+                    img.src = url;
+                    img.style.maxWidth = '400px';
+                    img.style.maxHeight = '400px';
+                    img.style.marginTop = '10px';
+                    img.style.borderRadius = '5px';
+                    img.style.border = '1px solid #e9ecef';
+
+                    // Add to last message
+                    const messagesDiv = document.getElementById('messages');
+                    const lastMessage = messagesDiv.lastElementChild;
+                    if (lastMessage) {
+                        lastMessage.appendChild(document.createElement('br'));
+                        lastMessage.appendChild(img);
+                    }
+
+                    // Clean up object URL after image loads
+                    img.onload = () => URL.revokeObjectURL(url);
+                } else {
+                    // Not an image, display as binary data
+                    try {
+                        const text = new TextDecoder().decode(bytes);
+                        addMessage(`[BINARY] ${text} (${bytes.length} bytes: [${Array.from(bytes).slice(0, 20).join(', ')}${bytes.length > 20 ? '...' : ''}])`, 'received');
+                    } catch {
+                        addMessage(`[BINARY] ${bytes.length} bytes: [${Array.from(bytes).slice(0, 20).join(', ')}${bytes.length > 20 ? '...' : ''}]`, 'received');
+                    }
+                }
+            });
+        }
+
+        function detectImageType(bytes) {
+            // Check magic bytes to detect image type
+            if (bytes.length < 4) return null;
+
+            // PNG: 89 50 4E 47
+            if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+                return 'image/png';
+            }
+
+            // JPEG: FF D8 FF
+            if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+                return 'image/jpeg';
+            }
+
+            // GIF: 47 49 46 38
+            if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+                return 'image/gif';
+            }
+
+            // WebP: 52 49 46 46 ... 57 45 42 50
+            if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+                if (bytes.length >= 12 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+                    return 'image/webp';
+                }
+            }
+
+            // BMP: 42 4D
+            if (bytes[0] === 0x42 && bytes[1] === 0x4D) {
+                return 'image/bmp';
+            }
+
+            return null; // Not a recognized image format
+        }
+
+        function handleMessageTypeChange() {
+            const messageType = document.getElementById('messageType').value;
+            const fileUpload = document.getElementById('fileUpload');
+            const textInput = document.getElementById('textInput');
+
+            if (messageType === 'image') {
+                fileUpload.style.display = 'block';
+                textInput.style.display = 'none';
+            } else {
+                fileUpload.style.display = 'none';
+                textInput.style.display = 'flex';
+            }
+        }
+
+        function handleFileSelect(event) {
+            selectedFile = event.target.files[0];
+            const fileInfo = document.getElementById('fileInfo');
+            const sendFileBtn = document.getElementById('sendFileBtn');
+
+            if (selectedFile) {
+                const sizeMB = (selectedFile.size / 1024 / 1024).toFixed(2);
+                fileInfo.textContent = `Selected: ${selectedFile.name} (${sizeMB} MB, ${selectedFile.type})`;
+                sendFileBtn.disabled = false;
+            } else {
+                fileInfo.textContent = 'No file selected';
+                sendFileBtn.disabled = true;
+            }
+        }
+
+        function sendImageFile() {
+            if (!selectedFile || !ws || ws.readyState !== WebSocket.OPEN) {
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                // Send the image as binary data
+                const arrayBuffer = event.target.result;
+                ws.send(arrayBuffer);
+
+                sentCount++;
+                updateStats();
+
+                const sizeMB = (selectedFile.size / 1024 / 1024).toFixed(2);
+                addMessage(`[IMAGE] Sent: ${selectedFile.name} (${sizeMB} MB, ${selectedFile.type})`, 'sent');
+
+                // Create a preview
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(selectedFile);
+                img.style.maxWidth = '200px';
+                img.style.maxHeight = '200px';
+                img.style.marginTop = '5px';
+                img.style.borderRadius = '5px';
+
+                const messagesDiv = document.getElementById('messages');
+                const lastMessage = messagesDiv.lastElementChild;
+                if (lastMessage) {
+                    lastMessage.appendChild(img);
+                }
+
+                // Reset file input
+                document.getElementById('fileInput').value = '';
+                selectedFile = null;
+                document.getElementById('fileInfo').textContent = 'No file selected';
+                document.getElementById('sendFileBtn').disabled = true;
+            };
+
+            reader.onerror = () => {
+                addMessage(`[ERROR] Failed to read file: ${selectedFile.name}`, 'error');
+            };
+
+            // Read file as ArrayBuffer (binary data)
+            reader.readAsArrayBuffer(selectedFile);
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function addMessage(text, type) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message-${type}`;
+
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = `<span class="timestamp">${timestamp}</span>${text}`;
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+            sentCount = 0;
+            receivedCount = 0;
+            updateStats();
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const messageInput = document.getElementById('messageInput');
+            const messageType = document.getElementById('messageType');
+            const sendBtn = document.getElementById('sendBtn');
+            const quickBtns = document.querySelectorAll('.quick-btn');
+
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                messageInput.disabled = false;
+                messageType.disabled = false;
+                sendBtn.disabled = false;
+                quickBtns.forEach(btn => btn.disabled = false);
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                messageInput.disabled = true;
+                messageType.disabled = true;
+                sendBtn.disabled = true;
+                quickBtns.forEach(btn => btn.disabled = true);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('sentCount').textContent = sentCount;
+            document.getElementById('receivedCount').textContent = receivedCount;
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                if (connectionStartTime) {
+                    const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60);
+                    const seconds = elapsed % 60;
+                    document.getElementById('connectionTime').textContent =
+                        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            connectionStartTime = null;
+            document.getElementById('connectionTime').textContent = '00:00';
+        }
+
+        // Add welcome message
+        window.onload = () => {
+            addMessage('👋 Welcome to the WebSocket test client! Click "Connect" to start.', 'system');
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lesson 2 - Connection Management Client</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+
+      .header p {
+        opacity: 0.9;
+        font-size: 16px;
+      }
+
+      .status-bar {
+        display: flex;
+        justify-content: space-around;
+        padding: 20px;
+        background: #f8f9fa;
+        border-bottom: 2px solid #e9ecef;
+      }
+
+      .status-item {
+        text-align: center;
+      }
+
+      .status-label {
+        font-size: 12px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+      }
+
+      .status-value {
+        font-size: 20px;
+        font-weight: bold;
+        color: #212529;
+      }
+
+      .connection-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #dc3545;
+        animation: pulse 2s infinite;
+      }
+
+      .status-dot.connected {
+        background: #28a745;
+      }
+
+      .status-dot.reconnecting {
+        background: #ffc107;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .controls {
+        padding: 20px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+        border-bottom: 1px solid #e9ecef;
+      }
+
+      button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .btn-connect {
+        background: #28a745;
+        color: white;
+      }
+
+      .btn-connect:hover:not(:disabled) {
+        background: #218838;
+      }
+
+      .btn-disconnect {
+        background: #dc3545;
+        color: white;
+      }
+
+      .btn-disconnect:hover:not(:disabled) {
+        background: #c82333;
+      }
+
+      .btn-test {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-test:hover:not(:disabled) {
+        background: #5568d3;
+      }
+
+      .btn-clear {
+        background: #6c757d;
+        color: white;
+      }
+
+      .btn-clear:hover {
+        background: #5a6268;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .message-section {
+        padding: 20px;
+      }
+
+      .input-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      #messageInput {
+        flex: 1;
+        padding: 12px;
+        border: 2px solid #e9ecef;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      #messageInput:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .btn-send {
+        background: #667eea;
+        color: white;
+        padding: 12px 30px;
+      }
+
+      .btn-send:hover:not(:disabled) {
+        background: #5568d3;
+      }
+
+      .messages-container {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        min-height: 400px;
+        max-height: 500px;
+        overflow-y: auto;
+      }
+
+      .messages-label {
+        font-weight: bold;
+        color: #495057;
+        margin-bottom: 15px;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .message {
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        line-height: 1.5;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.sent {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+      }
+
+      .message.received {
+        background: #d1ecf1;
+        border-left: 4px solid #17a2b8;
+      }
+
+      .message.error {
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+      }
+
+      .message.info {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+      }
+
+      .message.system {
+        background: #e7f3ff;
+        border-left: 4px solid #667eea;
+      }
+
+      .message-time {
+        font-size: 11px;
+        color: #6c757d;
+        margin-top: 4px;
+      }
+
+      .queue-info {
+        padding: 15px;
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        margin-bottom: 20px;
+        border-radius: 6px;
+        display: none;
+      }
+
+      .queue-info.visible {
+        display: block;
+      }
+
+      .reconnect-info {
+        padding: 15px;
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+        margin-bottom: 20px;
+        border-radius: 6px;
+        display: none;
+      }
+
+      .reconnect-info.visible {
+        display: block;
+      }
+
+      .test-buttons {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .test-btn {
+        padding: 8px 16px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+
+      .test-btn:hover:not(:disabled) {
+        background: #5568d3;
+      }
+
+      .test-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Lesson 2: Connection Management Client</h1>
+        <p>Production-ready WebSocket with automatic reconnection</p>
+      </div>
+
+      <div class="status-bar">
+        <div class="status-item">
+          <div class="status-label">Status</div>
+          <div class="connection-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span class="status-value" id="statusText">Disconnected</span>
+          </div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Messages Sent</div>
+          <div class="status-value" id="sentCount">0</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Messages Received</div>
+          <div class="status-value" id="receivedCount">0</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Queued</div>
+          <div class="status-value" id="queuedCount">0</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Reconnect Attempts</div>
+          <div class="status-value" id="reconnectAttempts">0</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Connection Time</div>
+          <div class="status-value" id="connectionTime">0s</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="connectBtn" class="btn-connect" onclick="connect()">
+          Connect
+        </button>
+        <button
+          id="disconnectBtn"
+          class="btn-disconnect"
+          onclick="disconnect()"
+          disabled
+        >
+          Disconnect
+        </button>
+        <button class="btn-clear" onclick="clearMessages()">
+          Clear Messages
+        </button>
+      </div>
+
+      <div class="message-section">
+        <div id="queueInfo" class="queue-info">
+          <strong>⏳ Messages Queued:</strong> Disconnected - messages will be
+          sent when reconnected
+        </div>
+
+        <div id="reconnectInfo" class="reconnect-info">
+          <strong>🔄 Reconnecting:</strong> <span id="reconnectStatus"></span>
+        </div>
+
+        <div class="test-buttons">
+          <button
+            class="test-btn"
+            onclick="sendTestMessage()"
+            disabled
+            id="sendTestBtn"
+          >
+            Send Test Message
+          </button>
+          <button
+            class="test-btn"
+            onclick="simulateDisconnect()"
+            disabled
+            id="disconnectTestBtn"
+          >
+            Simulate Network Issue
+          </button>
+          <button class="test-btn" onclick="sendBurst()" disabled id="burstBtn">
+            Send 10 Messages (Burst)
+          </button>
+          <button
+            class="test-btn"
+            onclick="enableAutoReconnect = !enableAutoReconnect; updateAutoReconnectUI()"
+          >
+            Auto-Reconnect: <span id="autoReconnectStatus">ON</span>
+          </button>
+        </div>
+
+        <div class="input-group">
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="Type your message here..."
+            disabled
+            onkeypress="handleKeyPress(event)"
+          />
+          <button
+            id="sendBtn"
+            class="btn-send"
+            onclick="sendMessage()"
+            disabled
+          >
+            Send
+          </button>
+        </div>
+
+        <div class="messages-container">
+          <div class="messages-label">📨 Messages & Events</div>
+          <div id="messages"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ReconnectingWebSocket class with exponential backoff
+      class ReconnectingWebSocket {
+        constructor(url) {
+          this.url = url;
+          this.ws = null;
+          this.reconnectAttempts = 0;
+          this.maxReconnectAttempts = 10;
+          this.reconnectDelay = 20000; // Start with 5 seconds (gives time to queue messages)
+          this.messageQueue = [];
+          this.isIntentionallyClosed = false;
+          this.connectionStartTime = null;
+          this.reconnectTimer = null;
+        }
+
+        connect() {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            console.log("Already connected");
+            return;
+          }
+
+          this.isIntentionallyClosed = false;
+          addMessage("🔌 Connecting to " + this.url, "system");
+          updateStatus("connecting");
+
+          try {
+            this.ws = new WebSocket(this.url);
+            this.setupEventHandlers();
+          } catch (error) {
+            addMessage("❌ Connection failed: " + error.message, "error");
+            this.scheduleReconnect();
+          }
+        }
+
+        setupEventHandlers() {
+          this.ws.onopen = () => {
+            addMessage("✅ Connected successfully!", "system");
+            this.connectionStartTime = Date.now();
+            updateStatus("connected");
+
+            // Reset reconnection tracking
+            this.reconnectAttempts = 0;
+            this.reconnectDelay = 5000; // Reset to 5 seconds
+            updateReconnectAttempts(0);
+            hideReconnectInfo();
+
+            // Send queued messages
+            this.flushMessageQueue();
+
+            startTimer();
+          };
+
+          this.ws.onmessage = (event) => {
+            receivedCount++;
+            updateStats();
+            addMessage("📨 " + event.data, "received");
+          };
+
+          this.ws.onerror = (error) => {
+            console.error("WebSocket error:", error);
+            addMessage("❌ WebSocket error occurred", "error");
+          };
+
+          this.ws.onclose = (event) => {
+            stopTimer();
+
+            if (event.wasClean) {
+              addMessage(
+                `🔌 Disconnected (code: ${event.code}, reason: ${
+                  event.reason || "none"
+                })`,
+                "info"
+              );
+            } else {
+              addMessage(
+                `⚠️ Connection lost abnormally (code: ${event.code})`,
+                "error"
+              );
+            }
+
+            updateStatus("disconnected");
+
+            // Handle different close codes
+            if (event.code === 1000) {
+              addMessage("👋 Normal closure - not reconnecting", "info");
+              this.isIntentionallyClosed = true;
+            } else if (event.code === 1001) {
+              addMessage(
+                "🔄 Server going away - will reconnect shortly",
+                "info"
+              );
+              this.scheduleReconnect();
+            } else if (event.code === 1006) {
+              addMessage(
+                "⚠️ Abnormal closure (network issue?) - reconnecting...",
+                "error"
+              );
+              this.scheduleReconnect();
+            } else if (event.code === 4000) {
+              addMessage("🧪 Simulated disconnect - reconnecting...", "info");
+              this.scheduleReconnect();
+            } else {
+              addMessage(
+                `🔄 Connection closed (code ${event.code}) - reconnecting...`,
+                "info"
+              );
+              this.scheduleReconnect();
+            }
+          };
+        }
+
+        scheduleReconnect() {
+          if (this.isIntentionallyClosed || !enableAutoReconnect) {
+            return;
+          }
+
+          if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            addMessage(
+              `❌ Max reconnection attempts (${this.maxReconnectAttempts}) reached. Please reconnect manually.`,
+              "error"
+            );
+            hideReconnectInfo();
+            return;
+          }
+
+          this.reconnectAttempts++;
+          updateReconnectAttempts(this.reconnectAttempts);
+
+          const delay = this.reconnectDelay;
+          addMessage(
+            `⏳ Reconnecting in ${delay / 1000}s (attempt ${
+              this.reconnectAttempts
+            }/${this.maxReconnectAttempts})`,
+            "info"
+          );
+
+          showReconnectInfo(
+            `Attempt ${this.reconnectAttempts}/${
+              this.maxReconnectAttempts
+            } - Retrying in ${delay / 1000}s`
+          );
+          updateStatus("reconnecting");
+
+          this.reconnectTimer = setTimeout(() => {
+            this.connect();
+          }, delay);
+
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
+          this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
+        }
+
+        send(message) {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            // Connected - send immediately
+            this.ws.send(message);
+            sentCount++;
+            updateStats();
+            addMessage("📤 " + message, "sent");
+          } else {
+            // Disconnected - queue message
+            this.messageQueue.push(message);
+            updateQueueCount();
+            addMessage("⏳ Message queued: " + message, "info");
+            showQueueInfo();
+          }
+        }
+
+        flushMessageQueue() {
+          if (this.messageQueue.length === 0) {
+            return;
+          }
+
+          addMessage(
+            `📤 Sending ${this.messageQueue.length} queued messages...`,
+            "system"
+          );
+
+          while (this.messageQueue.length > 0) {
+            const message = this.messageQueue.shift();
+            if (this.ws.readyState === WebSocket.OPEN) {
+              this.ws.send(message);
+              sentCount++;
+              addMessage("📤 [Queued] " + message, "sent");
+            }
+          }
+
+          updateQueueCount();
+          hideQueueInfo();
+          updateStats();
+        }
+
+        close(code = 1000, reason = "Normal closure") {
+          this.isIntentionallyClosed = true;
+
+          if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+          }
+
+          if (this.ws) {
+            this.ws.close(code, reason);
+          }
+
+          hideReconnectInfo();
+        }
+
+        getReadyState() {
+          return this.ws ? this.ws.readyState : WebSocket.CLOSED;
+        }
+      }
+
+      // Global variables
+      let reconnectingWS = null;
+      let sentCount = 0;
+      let receivedCount = 0;
+      let connectionStartTime = null;
+      let timerInterval = null;
+      let enableAutoReconnect = true;
+
+      function connect() {
+        reconnectingWS = new ReconnectingWebSocket("ws://localhost:8080/ws");
+        reconnectingWS.connect();
+      }
+
+      function disconnect() {
+        if (reconnectingWS) {
+          addMessage("👋 Disconnecting...", "system");
+          reconnectingWS.close(1000, "User requested disconnect");
+          reconnectingWS = null;
+        }
+        updateStatus("disconnected");
+        stopTimer();
+      }
+
+      function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const message = input.value.trim();
+
+        if (message && reconnectingWS) {
+          reconnectingWS.send(message);
+          input.value = "";
+          input.focus();
+        }
+      }
+
+      function sendTestMessage() {
+        if (reconnectingWS) {
+          reconnectingWS.send(
+            `Test message at ${new Date().toLocaleTimeString()}`
+          );
+        }
+      }
+
+      function sendBurst() {
+        if (reconnectingWS) {
+          for (let i = 1; i <= 10; i++) {
+            reconnectingWS.send(`Burst message ${i}/10`);
+          }
+        }
+      }
+
+      function simulateDisconnect() {
+        if (reconnectingWS && reconnectingWS.ws) {
+          addMessage("🧪 Simulating network disconnect...", "system");
+          // Browser only allows: 1000, or 3000-4999
+          // Using 4000 (custom application code) to trigger reconnection
+          reconnectingWS.ws.close(4000, "Simulated network failure");
+        } else {
+          addMessage("⚠️ Cannot simulate disconnect - not connected", "error");
+        }
+      }
+
+      function handleKeyPress(event) {
+        if (event.key === "Enter") {
+          sendMessage();
+        }
+      }
+
+      function addMessage(text, type) {
+        const messagesDiv = document.getElementById("messages");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${type}`;
+
+        const textDiv = document.createElement("div");
+        textDiv.textContent = text;
+
+        const timeDiv = document.createElement("div");
+        timeDiv.className = "message-time";
+        timeDiv.textContent = new Date().toLocaleTimeString();
+
+        messageDiv.appendChild(textDiv);
+        messageDiv.appendChild(timeDiv);
+        messagesDiv.appendChild(messageDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      function clearMessages() {
+        document.getElementById("messages").innerHTML = "";
+      }
+
+      function updateStatus(status) {
+        const statusDot = document.getElementById("statusDot");
+        const statusText = document.getElementById("statusText");
+        const connectBtn = document.getElementById("connectBtn");
+        const disconnectBtn = document.getElementById("disconnectBtn");
+        const messageInput = document.getElementById("messageInput");
+        const sendBtn = document.getElementById("sendBtn");
+        const testBtns = document.querySelectorAll(".test-btn");
+
+        statusDot.className = "status-dot";
+
+        if (status === "connected") {
+          statusDot.classList.add("connected");
+          statusText.textContent = "Connected";
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          messageInput.disabled = false;
+          sendBtn.disabled = false;
+          document.getElementById("sendTestBtn").disabled = false;
+          document.getElementById("disconnectTestBtn").disabled = false;
+          document.getElementById("burstBtn").disabled = false;
+        } else if (status === "reconnecting") {
+          statusDot.classList.add("reconnecting");
+          statusText.textContent = "Reconnecting...";
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          messageInput.disabled = false;
+          sendBtn.disabled = false;
+          document.getElementById("sendTestBtn").disabled = false;
+          document.getElementById("disconnectTestBtn").disabled = true;
+          document.getElementById("burstBtn").disabled = false;
+        } else if (status === "connecting") {
+          statusText.textContent = "Connecting...";
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+        } else {
+          statusText.textContent = "Disconnected";
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          messageInput.disabled = true;
+          sendBtn.disabled = true;
+          document.getElementById("sendTestBtn").disabled = true;
+          document.getElementById("disconnectTestBtn").disabled = true;
+          document.getElementById("burstBtn").disabled = true;
+        }
+      }
+
+      function updateStats() {
+        document.getElementById("sentCount").textContent = sentCount;
+        document.getElementById("receivedCount").textContent = receivedCount;
+      }
+
+      function updateQueueCount() {
+        const count = reconnectingWS ? reconnectingWS.messageQueue.length : 0;
+        document.getElementById("queuedCount").textContent = count;
+      }
+
+      function updateReconnectAttempts(attempts) {
+        document.getElementById("reconnectAttempts").textContent = attempts;
+      }
+
+      function showQueueInfo() {
+        document.getElementById("queueInfo").classList.add("visible");
+      }
+
+      function hideQueueInfo() {
+        document.getElementById("queueInfo").classList.remove("visible");
+      }
+
+      function showReconnectInfo(text) {
+        const info = document.getElementById("reconnectInfo");
+        document.getElementById("reconnectStatus").textContent = text;
+        info.classList.add("visible");
+      }
+
+      function hideReconnectInfo() {
+        document.getElementById("reconnectInfo").classList.remove("visible");
+      }
+
+      function updateAutoReconnectUI() {
+        document.getElementById("autoReconnectStatus").textContent =
+          enableAutoReconnect ? "ON" : "OFF";
+        addMessage(
+          `Auto-reconnect: ${enableAutoReconnect ? "ENABLED" : "DISABLED"}`,
+          "info"
+        );
+      }
+
+      function startTimer() {
+        stopTimer();
+        timerInterval = setInterval(() => {
+          if (reconnectingWS && reconnectingWS.connectionStartTime) {
+            const elapsed = Math.floor(
+              (Date.now() - reconnectingWS.connectionStartTime) / 1000
+            );
+            document.getElementById("connectionTime").textContent =
+              elapsed + "s";
+          }
+        }, 1000);
+      }
+
+      function stopTimer() {
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        document.getElementById("connectionTime").textContent = "0s";
+      }
+
+      // Initialize
+      updateStatus("disconnected");
+      addMessage('👋 Welcome! Click "Connect" to start.', "system");
+      addMessage("💡 This client features:", "system");
+      addMessage(
+        "   • Automatic reconnection with exponential backoff",
+        "system"
+      );
+      addMessage("   • Message queuing during disconnection", "system");
+      addMessage("   • Connection health monitoring", "system");
+      addMessage("   • Test utilities for simulating failures", "system");
+    </script>
+  </body>
+</html>
