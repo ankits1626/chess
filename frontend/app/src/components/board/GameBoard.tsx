@@ -18,6 +18,8 @@ const GameBoard = () => {
     lastMove,
     selectSquare: onSquareClick,
     mode,
+    playerColor,
+    isBoardFlipped,
   } = useGameStore();
 
   const board = game.board();
@@ -25,19 +27,30 @@ const GameBoard = () => {
   const files: ChessFile[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
   const ranks: ChessRank[] = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
+  // Flip board based on player color or manual flip toggle
+  // In replay/live mode: just use manual flip state
+  // In computer mode: auto-flip for black, manual flip toggles (XOR logic)
+  const autoFlip = playerColor === 'black';
+  const isFlipped = playerColor ? (isBoardFlipped ? !autoFlip : autoFlip) : isBoardFlipped;
+
+  const displayFiles = isFlipped ? [...files].reverse() : files;
+  const displayRanks = isFlipped ? [...ranks] : [...ranks].reverse();
+
   const squares: Array<{
     name: SquareType;
     color: SquareColor;
     piece: ChessPiece | null;
   }> = [];
 
-  // Iterate from rank 8 down to rank 1 (top to bottom visually)
-  for (let rankIndex = 7; rankIndex >= 0; rankIndex--) {
-    const rank = ranks[rankIndex];
+  // Iterate through ranks and files according to board orientation
+  for (let rankIdx = 0; rankIdx < 8; rankIdx++) {
+    const rank = displayRanks[rankIdx];
+    const rankIndex = ranks.indexOf(rank);
 
-    // Iterate from file 'a' to 'h' (left to right)
-    for (let fileIndex = 0; fileIndex < 8; fileIndex++) {
-      const file = files[fileIndex];
+    // Iterate through files
+    for (let fileIdx = 0; fileIdx < 8; fileIdx++) {
+      const file = displayFiles[fileIdx];
+      const fileIndex = files.indexOf(file);
       const squareName = `${file}${rank}` as SquareType;
 
       // Calculate color
@@ -66,16 +79,13 @@ const GameBoard = () => {
 
   return (
     <div className={`relative ${boardSize} mx-auto transition-all duration-300`}>
-      {/* Rank labels (8-1) on the left */}
+      {/* Rank labels on the left */}
       <div className="absolute -left-6 top-0 h-full flex flex-col justify-around text-gray-400 text-sm transition-all duration-300">
-        {ranks
-          .slice()
-          .reverse()
-          .map((rank) => (
-            <span key={`rank-${rank}`} className="flex items-center justify-center h-full">
-              {rank}
-            </span>
-          ))}
+        {displayRanks.map((rank) => (
+          <span key={`rank-${rank}`} className="flex items-center justify-center h-full">
+            {rank}
+          </span>
+        ))}
       </div>
 
       <div className="w-full h-full grid grid-cols-8 grid-rows-8 border-2 border-[#759656] transition-all duration-300">
@@ -93,9 +103,9 @@ const GameBoard = () => {
         ))}
       </div>
 
-      {/* File labels (a-h) at the bottom */}
+      {/* File labels at the bottom */}
       <div className="absolute -bottom-5 left-0 w-full flex justify-around text-gray-400 text-sm px-2 transition-all duration-300">
-        {files.map((file) => (
+        {displayFiles.map((file) => (
           <span key={`file-${file}`} className="flex items-center justify-center w-full">
             {file}
           </span>

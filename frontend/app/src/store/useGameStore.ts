@@ -60,6 +60,9 @@ interface GameState {
   connectionStatus: ConnectionStatus;
   gameError: string | null;
 
+  // Board display state
+  isBoardFlipped: boolean;
+
   // Actions
   selectSquare: (square: Square) => void;
   handlePromotion: (piece: PieceType) => void;
@@ -88,6 +91,9 @@ interface GameState {
   setComputerThinking: (thinking: boolean) => void;
   endGame: (result: GameResult) => void;
   disconnectGame: () => void;
+
+  // Board display actions
+  toggleBoardFlip: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -119,6 +125,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   connectionStatus: 'disconnected',
   gameError: null,
 
+  // Board display initial state
+  isBoardFlipped: false,
+
   // Actions
   resetGame: () => {
     get().stopAutoplay();
@@ -142,6 +151,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       gameId: null,
       connectionStatus: 'disconnected',
       gameError: null,
+      isBoardFlipped: false,
     });
   },
 
@@ -418,6 +428,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         lastMove: null,
         whitePlayer: color === 'white' ? 'You' : 'Computer',
         blackPlayer: color === 'black' ? 'You' : 'Computer',
+        isBoardFlipped: false, // Reset flip state, will auto-flip based on playerColor
       });
 
       // Set up event listeners
@@ -498,6 +509,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         isComputerThinking: false,
       });
     }
+  },
+
+  // Board display actions
+  toggleBoardFlip: () => {
+    set({ isBoardFlipped: !get().isBoardFlipped });
   },
 
   // Debug Actions

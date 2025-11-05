@@ -7,10 +7,10 @@ const GameInfo = () => {
   const opponentType = useGameStore(state => state.opponentType);
   const computerDifficulty = useGameStore(state => state.computerDifficulty);
   const isComputerThinking = useGameStore(state => state.isComputerThinking);
-  const whitePlayer = useGameStore(state => state.whitePlayer);
-  const blackPlayer = useGameStore(state => state.blackPlayer);
   const gameError = useGameStore(state => state.gameError);
   const mode = useGameStore(state => state.mode);
+  const toggleBoardFlip = useGameStore(state => state.toggleBoardFlip);
+  const isBoardFlipped = useGameStore(state => state.isBoardFlipped);
 
   const turn = game.turn() === 'w' ? 'White' : 'Black';
   const isCheck = game.isCheck();
@@ -23,12 +23,24 @@ const GameInfo = () => {
     <div className="bg-gray-700 p-6 rounded-lg w-full lg:w-80">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold">Game Info</h2>
-        <button
-          onClick={onNewGame}
-          className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-3 py-1 rounded transition-colors"
-        >
-          New Game
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={toggleBoardFlip}
+            className="bg-gray-600 hover:bg-gray-500 text-white text-sm font-semibold px-3 py-1 rounded transition-colors flex items-center gap-1"
+            title="Flip board"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+            {isBoardFlipped ? 'Reset' : 'Flip'}
+          </button>
+          <button
+            onClick={onNewGame}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-3 py-1 rounded transition-colors"
+          >
+            New Game
+          </button>
+        </div>
       </div>
 
       {/* Computer Game Info */}
@@ -44,24 +56,6 @@ const GameInfo = () => {
             <div className="flex items-center gap-2 text-sm text-yellow-400 animate-pulse">
               <div className="w-4 h-4 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
               <span>Computer is thinking...</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Players */}
-      {(whitePlayer || blackPlayer) && (
-        <div className="mb-4 space-y-2 text-sm">
-          {whitePlayer && (
-            <div className="flex justify-between">
-              <span className="text-gray-400">White:</span>
-              <span className="font-semibold">{whitePlayer}</span>
-            </div>
-          )}
-          {blackPlayer && (
-            <div className="flex justify-between">
-              <span className="text-gray-400">Black:</span>
-              <span className="font-semibold">{blackPlayer}</span>
             </div>
           )}
         </div>

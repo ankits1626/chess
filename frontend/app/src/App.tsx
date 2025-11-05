@@ -43,6 +43,18 @@ function App() {
   const isFirstMove = replayIndex === -1;
   const isLastMove = replayIndex === replayMoves.length - 1;
 
+  // Board flip state
+  const playerColor = useGameStore(state => state.playerColor);
+  const isBoardFlipped = useGameStore(state => state.isBoardFlipped);
+
+  // Calculate if board is visually flipped (same logic as GameBoard/GameInfo)
+  const autoFlip = playerColor === 'black';
+  const isFlipped = playerColor ? (isBoardFlipped ? !autoFlip : autoFlip) : isBoardFlipped;
+
+  // Determine player display order based on board orientation
+  const topPlayer = isFlipped ? whitePlayer : blackPlayer;
+  const bottomPlayer = isFlipped ? blackPlayer : whitePlayer;
+
   // Handle starting a computer game
   const handleStartComputerGame = async (color: PlayerColor, difficulty: Difficulty) => {
     setIsStartingGame(true);
@@ -102,9 +114,9 @@ function App() {
       <div className="max-w-[1600px] mx-auto h-full">
         <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-start lg:items-center justify-center min-h-[calc(100vh-2rem)] sm:min-h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-4rem)]">
           <div className="flex flex-col gap-2 items-center w-full lg:w-auto">
-            {mode === 'replay' && <PlayerDisplay name={blackPlayer} />}
+            {mode === 'replay' && <PlayerDisplay name={topPlayer} />}
             <GameBoard />
-            {mode === 'replay' && <PlayerDisplay name={whitePlayer} />}
+            {mode === 'replay' && <PlayerDisplay name={bottomPlayer} />}
           </div>
           <div className="flex flex-col gap-4 w-full lg:w-80 pb-8 lg:pb-0">
             <GameInfo />
