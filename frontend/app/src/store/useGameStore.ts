@@ -1,11 +1,21 @@
 import { create } from 'zustand';
 import { Chess, Move } from 'chess.js';
 import type { Square, PieceType, PieceColor } from '@/types/chess';
+import type {
+  GameMode,
+  OpponentType,
+  Difficulty,
+  PlayerColor,
+  ConnectionStatus,
+  MoveEvent,
+  GameResult,
+} from '@/types/game';
 import {
   fetchUserArchives,
   fetchMonthGames,
   type ChessComGame,
 } from '@/services/chesscomApi';
+import { gameService } from '@/services/gameService';
 
 // Type definitions
 export type LastMove = { from: Square; to: Square } | null;
@@ -26,7 +36,7 @@ interface GameState {
   debugActions?: DebugActions;
 
   // Replay state
-  mode: 'live' | 'replay';
+  mode: GameMode;
   replayMoves: Move[];
   replayIndex: number;
   isAutoplaying: boolean;
@@ -40,6 +50,15 @@ interface GameState {
   isGameListLoading: boolean;
   fetchGamesError: string | null;
   currentArchiveUrl: string | null;
+
+  // Computer game state
+  opponentType: OpponentType;
+  computerDifficulty: Difficulty;
+  isComputerThinking: boolean;
+  playerColor: PlayerColor | null;
+  gameId: string | null;
+  connectionStatus: ConnectionStatus;
+  gameError: string | null;
 
   // Actions
   selectSquare: (square: Square) => void;
@@ -62,6 +81,13 @@ interface GameState {
   fetchGamesForArchive: (url: string) => Promise<void>;
   loadPgnFromGame: (game: ChessComGame) => void;
   resetGameImporter: () => void;
+
+  // Computer game actions
+  startComputerGame: (color: PlayerColor, difficulty: Difficulty, userId: string) => Promise<void>;
+  handleComputerMove: (moveUCI: string) => void;
+  setComputerThinking: (thinking: boolean) => void;
+  endGame: (result: GameResult) => void;
+  disconnectGame: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -84,10 +110,20 @@ export const useGameStore = create<GameState>((set, get) => ({
   fetchGamesError: null,
   currentArchiveUrl: null,
 
+  // Computer game initial state
+  opponentType: 'human',
+  computerDifficulty: 'medium',
+  isComputerThinking: false,
+  playerColor: null,
+  gameId: null,
+  connectionStatus: 'disconnected',
+  gameError: null,
+
   // Actions
   resetGame: () => {
     get().stopAutoplay();
     get().resetGameImporter();
+    get().disconnectGame();
     set({
       game: new Chess(),
       selectedSquare: null,
@@ -99,6 +135,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       replayIndex: -1,
       whitePlayer: null,
       blackPlayer: null,
+      opponentType: 'human',
+      computerDifficulty: 'medium',
+      isComputerThinking: false,
+      playerColor: null,
+      gameId: null,
+      connectionStatus: 'disconnected',
+      gameError: null,
     });
   },
 
@@ -242,9 +285,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   selectSquare: (square: Square) => {
-    const { game, pendingMove, selectedSquare, mode } = get();
+    const { game, pendingMove, selectedSquare, mode, opponentType, playerColor, gameId, isComputerThinking } = get();
     if (mode === 'replay') return;
     if (pendingMove) return;
+    if (isComputerThinking) return; // Don't allow moves while computer is thinking
+
+    // For computer games, only allow player to move their own pieces
+    if (opponentType === 'computer' && playerColor) {
+      const turnColor = game.turn(); // 'w' or 'b'
+      const playerTurn = (playerColor === 'white' && turnColor === 'w') || (playerColor === 'black' && turnColor === 'b');
+      if (!playerTurn) return; // Not player's turn
+    }
+
     if (!selectedSquare) {
       const piece = game.get(square);
       if (piece && piece.color === game.turn()) {
@@ -269,7 +321,39 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       const move = game.move({ from: selectedSquare, to: square });
       if (move) {
+        console.log('[GameStore] Move executed:', {
+          from: selectedSquare,
+          to: square,
+          san: move.san,
+          uci: `${selectedSquare}${square}`,
+          opponentType,
+          gameId,
+          mode,
+        });
+
         set({ game: Object.assign(Object.create(Object.getPrototypeOf(game)), game), lastMove: { from: selectedSquare, to: square }, selectedSquare: null, validMoves: [] });
+
+        // If playing against computer, send move to backend in SAN format
+        console.log('[GameStore] Checking if should send to backend:', {
+          opponentType,
+          isComputer: opponentType === 'computer',
+          gameId,
+          hasGameId: !!gameId,
+          shouldSend: opponentType === 'computer' && !!gameId,
+        });
+
+        if (opponentType === 'computer' && gameId) {
+          console.log('[GameStore] ✅ Sending move to backend:', move.san, 'gameId:', gameId);
+          gameService.makeMove(gameId, move.san).then((response) => {
+            console.log('[GameStore] ✅ Move response received:', response);
+            set({ isComputerThinking: true });
+          }).catch(error => {
+            console.error('[GameStore] ❌ Failed to send move:', error);
+            set({ gameError: error.message });
+          });
+        } else {
+          console.log('[GameStore] ❌ NOT sending to backend - conditions not met');
+        }
       } else {
         const newPiece = game.get(square);
         if (newPiece && newPiece.color === game.turn()) {
@@ -285,11 +369,135 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   handlePromotion: (piece: PieceType) => {
-    const { game, pendingMove, mode } = get();
+    const { game, pendingMove, mode, opponentType, gameId } = get();
     if (mode === 'replay') return;
     if (!pendingMove) return;
-    game.move({ from: pendingMove.from, to: pendingMove.to, promotion: piece });
+    const move = game.move({ from: pendingMove.from, to: pendingMove.to, promotion: piece });
     set({ game: Object.assign(Object.create(Object.getPrototypeOf(game)), game), lastMove: { from: pendingMove.from, to: pendingMove.to }, pendingMove: null });
+
+    // If playing against computer, send promotion move to backend in SAN format
+    if (opponentType === 'computer' && gameId && move) {
+      gameService.makeMove(gameId, move.san).then(() => {
+        set({ isComputerThinking: true });
+      }).catch(error => {
+        console.error('Failed to send promotion:', error);
+        set({ gameError: error.message });
+      });
+    }
+  },
+
+  // Computer game actions
+  startComputerGame: async (color: PlayerColor, difficulty: Difficulty, userId: string) => {
+    try {
+      console.log('[GameStore] Starting computer game:', { color, difficulty, userId });
+      set({ connectionStatus: 'connecting', gameError: null });
+
+      // Connect to WebSocket
+      console.log('[GameStore] Connecting to WebSocket...');
+      await gameService.connect(userId);
+      console.log('[GameStore] WebSocket connected');
+      set({ connectionStatus: 'connected' });
+
+      // Create game
+      console.log('[GameStore] Creating game with mode: human_vs_computer, difficulty:', difficulty, 'playerColor:', color);
+      const gameInfo = await gameService.createGame('human_vs_computer', difficulty, '5+0', color);
+      console.log('[GameStore] Game created:', gameInfo);
+
+      // Reset board and set up for computer game
+      const newGame = new Chess();
+      set({
+        game: newGame,
+        mode: 'computer',
+        opponentType: 'computer',
+        computerDifficulty: difficulty,
+        playerColor: color,
+        gameId: gameInfo.gameId,
+        selectedSquare: null,
+        validMoves: [],
+        pendingMove: null,
+        lastMove: null,
+        whitePlayer: color === 'white' ? 'You' : 'Computer',
+        blackPlayer: color === 'black' ? 'You' : 'Computer',
+      });
+
+      // Set up event listeners
+      console.log('[GameStore] Setting up event listeners');
+      gameService.onMove((moveEvent: MoveEvent) => {
+        console.log('[GameStore] Move event received:', moveEvent);
+        get().handleComputerMove(moveEvent.moveUCI);
+        if (moveEvent.isGameOver && moveEvent.result) {
+          get().endGame(moveEvent.result);
+        }
+      });
+
+      gameService.onGameEnd((result: GameResult) => {
+        console.log('[GameStore] Game end event received:', result);
+        get().endGame(result);
+      });
+
+      // If playing as black, computer makes first move (already handled by backend)
+      if (color === 'black') {
+        console.log('[GameStore] Playing as black, computer will move first');
+        set({ isComputerThinking: true });
+      }
+
+      console.log('[GameStore] Computer game started successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start game';
+      set({
+        gameError: errorMessage,
+        connectionStatus: 'error',
+      });
+      throw error;
+    }
+  },
+
+  handleComputerMove: (moveUCI: string) => {
+    const { game } = get();
+    console.log('[GameStore] Handling computer move:', moveUCI);
+    try {
+      // Parse UCI move (e.g., "e7e5" or "e7e8q" for promotion)
+      const move = game.move(moveUCI);
+      console.log('[GameStore] Computer move parsed:', move);
+      if (move) {
+        console.log('[GameStore] Computer move applied successfully');
+        set({
+          game: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          lastMove: { from: move.from as Square, to: move.to as Square },
+          isComputerThinking: false,
+        });
+      } else {
+        console.error('[GameStore] Invalid computer move:', moveUCI);
+        set({ gameError: 'Invalid computer move received', isComputerThinking: false });
+      }
+    } catch (error) {
+      console.error('[GameStore] Failed to apply computer move:', error);
+      set({ gameError: 'Failed to apply computer move', isComputerThinking: false });
+    }
+  },
+
+  setComputerThinking: (thinking: boolean) => {
+    set({ isComputerThinking: thinking });
+  },
+
+  endGame: (result: GameResult) => {
+    set({
+      isComputerThinking: false,
+      gameError: null,
+    });
+    // You can show a modal or notification here
+    console.log('Game ended:', result);
+  },
+
+  disconnectGame: () => {
+    if (get().connectionStatus !== 'disconnected') {
+      gameService.disconnect();
+      set({
+        connectionStatus: 'disconnected',
+        gameId: null,
+        isComputerThinking: false,
+      });
+    }
   },
 
   // Debug Actions

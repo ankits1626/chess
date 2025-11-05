@@ -1,7 +1,9 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useGameStore } from '@/store/useGameStore';
+import type { Difficulty, PlayerColor } from '@/types/game';
 import GameBoard from '@/components/board/GameBoard';
 import GameInfo from '@/components/game/GameInfo';
+import GameSetup from '@/components/game/GameSetup';
 import PromotionDialog from '@/components/game/PromotionDialog';
 import GameImporter from '@/components/importer/GameImporter';
 import ReplayControls from '@/components/replay/ReplayControls';
@@ -15,8 +17,12 @@ const DebugPanel = import.meta.env.DEV
 
 function App() {
   const { isPanelVisible, setIsPanelVisible } = useDebugPanel();
+  const [showGameSetup, setShowGameSetup] = useState(false);
+  const [isStartingGame, setIsStartingGame] = useState(false);
+
   const pendingMove = useGameStore(state => state.pendingMove);
   const handlePromotion = useGameStore(state => state.handlePromotion);
+  const startComputerGame = useGameStore(state => state.startComputerGame);
 
   // Replay state and actions
   const mode = useGameStore(state => state.mode);
@@ -37,11 +43,29 @@ function App() {
   const isFirstMove = replayIndex === -1;
   const isLastMove = replayIndex === replayMoves.length - 1;
 
-  // Cleanup autoplay on unmount
+  // Handle starting a computer game
+  const handleStartComputerGame = async (color: PlayerColor, difficulty: Difficulty) => {
+    setIsStartingGame(true);
+    try {
+      // TODO: Replace with actual user ID from auth system
+      const userId = '25d30da5-0cc4-4f5a-8c88-69d0f90b004c';
+      await startComputerGame(color, difficulty, userId);
+      setShowGameSetup(false);
+    } catch (error) {
+      console.error('Failed to start computer game:', error);
+      alert('Failed to start game. Please try again.');
+    } finally {
+      setIsStartingGame(false);
+    }
+  };
+
+  // Cleanup autoplay and WebSocket connection on unmount
   useEffect(() => {
-    return () => {
+    const cleanup = () => {
       stopAutoplay();
+      // GameStore handles WebSocket disconnection in resetGame
     };
+    return cleanup;
   }, [stopAutoplay]);
 
   // Keyboard shortcuts for replay controls
@@ -120,10 +144,31 @@ function App() {
         />
       )}
 
+      {showGameSetup && (
+        <GameSetup
+          onStartGame={handleStartComputerGame}
+          onClose={() => setShowGameSetup(false)}
+          isLoading={isStartingGame}
+        />
+      )}
+
       {isPanelVisible && DebugPanel && (
         <Suspense fallback={null}>
           <DebugPanel onClose={() => setIsPanelVisible(false)} />
         </Suspense>
+      )}
+
+      {/* Floating button to start computer game */}
+      {mode === 'live' && (
+        <button
+          onClick={() => setShowGameSetup(true)}
+          className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold py-4 px-6 rounded-full shadow-lg transition-all transform hover:scale-105 flex items-center gap-2"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <span>Play vs Computer</span>
+        </button>
       )}
     </div>
   );

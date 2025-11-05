@@ -29,6 +29,7 @@ type PendingGame struct {
 	GameID      string
 	Mode        player.GameMode
 	WhitePlayer player.Player
+	BlackType   player.PlayerType // Type of black player (Human or Computer)
 	Difficulty  string
 	TimeControl string
 }
@@ -62,25 +63,34 @@ func (m *GameManager) CreatePendingGame(
 	mode player.GameMode,
 	creator *websocket.Client,
 	difficulty string,
+	playerColor string,
 	timeControl string,
 ) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Determine white and black player types based on mode
-	whiteType, _ := mode.GetPlayerTypes()
+	// Determine player types based on mode and chosen color
+	whiteType, blackType := mode.GetPlayerTypes()
+
+	// If playing as black in human vs computer, swap the types
+	if mode == player.GameModeHumanVsComputer && playerColor == "black" {
+		whiteType = player.PlayerTypeComputer
+		blackType = player.PlayerTypeHuman
+	}
 
 	// Create white player
 	var whitePlayer player.Player
 	var err error
 
 	if whiteType == player.PlayerTypeHuman {
+		// Human is white
 		config := player.HumanPlayerConfig{Client: creator}
 		whitePlayer, err = m.playerFactory.CreatePlayer(config)
 		if err != nil {
 			return fmt.Errorf("failed to create white player: %w", err)
 		}
 	} else if whiteType == player.PlayerTypeComputer {
+		// Computer is white
 		config := player.ComputerPlayerConfig{Difficulty: difficulty}
 		whitePlayer, err = m.playerFactory.CreatePlayer(config)
 		if err != nil {
@@ -92,6 +102,7 @@ func (m *GameManager) CreatePendingGame(
 		GameID:      gameID,
 		Mode:        mode,
 		WhitePlayer: whitePlayer,
+		BlackType:   blackType,
 		Difficulty:  difficulty,
 		TimeControl: timeControl,
 	}
@@ -126,8 +137,8 @@ func (m *GameManager) ActivateGame(gameID string, blackClient *websocket.Client)
 		return nil, fmt.Errorf("pending game not found")
 	}
 
-	// Determine black player type from mode
-	_, blackType := pending.Mode.GetPlayerTypes()
+	// Use the black player type from pending game (already determined by CreatePendingGame)
+	blackType := pending.BlackType
 
 	// Create black player based on type
 	var blackPlayer player.Player

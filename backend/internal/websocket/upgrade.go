@@ -76,28 +76,14 @@ func (h *Handler) handleMessage(ctx context.Context, client *Client, data []byte
 	log.Printf("Received message from client %s: type=%s, action=%s, event=%s",
 		client.ID, msg.Type, msg.Action, msg.Event)
 
-	// TODO Phase 4: Implement actual message handlers
-	// For now, echo back a simple response
-	switch msg.Type {
-	case TypeRequest:
-		// Echo response for testing
-		resp := NewResponse(msg.ID, map[string]interface{}{
-			"echo":    "Request received",
-			"action":  msg.Action,
-			"message": "Handlers will be implemented in Phase 4",
-		})
-		client.SendMessage(resp)
-
-	case TypeEvent:
-		log.Printf("Event received: %s (events don't require responses)", msg.Event)
-
-	default:
-		errResp := NewErrorResponse(msg.ID, "Unknown message type")
-		client.SendMessage(errResp)
-	}
-
-	// If hub has a handler (Phase 4), call it
+	// Call the actual handler
 	if h.hub.handler != nil {
 		h.hub.handler.HandleMessage(ctx, client, msg)
+	} else {
+		// No handler registered - send error
+		if msg.Type == TypeRequest {
+			errResp := NewErrorResponse(msg.ID, "No handler registered")
+			client.SendMessage(errResp)
+		}
 	}
 }
