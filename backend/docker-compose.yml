@@ -38,6 +38,7 @@ services:
       - DB_PASSWORD=chess_coach_dev
       - DB_NAME=chess_coach_dev
       - DB_SSLMODE=disable
+      - STOCKFISH_PATH=/usr/local/bin/stockfish
     depends_on:
       postgres:
         condition: service_healthy

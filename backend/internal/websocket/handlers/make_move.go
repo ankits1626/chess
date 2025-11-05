@@ -8,6 +8,7 @@ import (
 
 	"github.com/ankits1626/chess-coach-backend/internal/database"
 	"github.com/ankits1626/chess-coach-backend/internal/websocket"
+	"github.com/ankits1626/chess-coach-backend/internal/websocket/handlers/player"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -124,14 +125,46 @@ func (h *MakeMoveHandler) Handle(ctx context.Context, client *websocket.Client, 
 	// 9. Send success response
 	websocket.SendSuccessResponse(client, msg.ID, responseData)
 
-	// 10. Broadcast to opponent
+	// 10. Broadcast to opponent using Player interface
 	opponent, err := h.manager.GetOpponent(gameIDStr, client)
 	if err == nil {
-		moveMadeEvent := websocket.NewEvent("moveMade", responseData)
-		opponent.SendMessage(moveMadeEvent)
+		// Create move notification
+		var playerResult *player.GameResult
+		if gameState.IsGameOver {
+			playerResult = &player.GameResult{
+				Winner: gameState.Result.Winner,
+				Method: gameState.Result.Method,
+				PGN:    gameState.Result.PGN,
+			}
+		}
+
+		moveNotification := player.MoveNotification{
+			GameID:     gameIDStr,
+			MoveSAN:    gameState.SAN,
+			MoveUCI:    gameState.UCI,
+			FEN:        gameState.FEN,
+			MoveNumber: gameState.MoveNumber,
+			IsGameOver: gameState.IsGameOver,
+			Result:     playerResult,
+		}
+
+		if err := opponent.SendMove(moveNotification); err != nil {
+			log.Printf("MakeMove: Failed to send move to opponent: %v", err)
+		}
 	}
 
-	// 11. Clean up if game over
+	// 11. Trigger computer move if it's computer's turn
+	mode, err := h.manager.GetGameMode(gameIDStr)
+	if err == nil && mode != player.GameModeHumanVsHuman && !gameState.IsGameOver {
+		// Trigger computer move in background
+		go func() {
+			if err := h.manager.HandleComputerMove(context.Background(), gameIDStr); err != nil {
+				log.Printf("MakeMove: Computer move failed: %v", err)
+			}
+		}()
+	}
+
+	// 12. Clean up if game over
 	if gameState.IsGameOver {
 		h.manager.RemoveActiveGame(gameIDStr)
 	}

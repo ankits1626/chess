@@ -13,15 +13,17 @@ import (
 	"github.com/ankits1626/chess-coach-backend/internal/server"
 	"github.com/ankits1626/chess-coach-backend/internal/websocket"
 	"github.com/ankits1626/chess-coach-backend/internal/websocket/handlers"
+	"github.com/ankits1626/chess-coach-backend/internal/websocket/handlers/player"
 )
 
 // App manages application lifecycle.
 type App struct {
-	config *config.Config
-	db     *database.DB
-	server server.Server
-	logger logger.Logger
-	wsHub  *websocket.Hub
+	config    *config.Config
+	db        *database.DB
+	server    server.Server
+	logger    logger.Logger
+	wsHub     *websocket.Hub
+	aiService player.AIService // AI service for computer players
 }
 
 // New creates new application.
@@ -29,18 +31,25 @@ func New(cfg *config.Config, db *database.DB, log logger.Logger) *App {
 	// Create chess service
 	chessService := handlers.NewChessService()
 
-	// Create game manager
-	gameManager := handlers.NewGameManager(db, chessService)
+	// Create AI service for computer players
+	aiService, err := player.NewStockfishService()
+	if err != nil {
+		log.Fatalf("Failed to initialize AI service: %v", err)
+	}
+
+	// Create game manager with AI service
+	gameManager := handlers.NewGameManager(db, chessService, aiService)
 
 	// Create handler router
 	handler := handlers.NewHandlerRouter(gameManager)
 	hub := websocket.NewHub(handler)
 	return &App{
-		config: cfg,
-		db:     db,
-		server: server.New(cfg, db, hub),
-		logger: log,
-		wsHub:  hub,
+		config:    cfg,
+		db:        db,
+		server:    server.New(cfg, db, hub),
+		logger:    log,
+		wsHub:     hub,
+		aiService: aiService,
 	}
 }
 
@@ -87,6 +96,9 @@ func (a *App) Run(ctx context.Context) error {
 
 // Close closes application resources.
 func (a *App) Close() {
+	if a.aiService != nil {
+		a.aiService.Close()
+	}
 	if a.db != nil {
 		a.db.Close()
 	}

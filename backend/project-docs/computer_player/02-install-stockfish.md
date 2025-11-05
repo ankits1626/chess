@@ -1,22 +1,27 @@
 # Step 2: Install & Containerize Stockfish
 
-**Duration**: 45 minutes
+**Duration**: 30 minutes (reduced - production Dockerfile already configured!)
 
 **Status**: ⬜ Not Started
 
-**Goal**: Install Stockfish locally for development and containerize for production deployment
+**Goal**: Install Stockfish locally for development and update development Docker setup
 
 ---
 
-## 🎯 Two Approaches
+## 🎉 Good News!
 
-### Approach A: Local Development (Quick Start)
-Install Stockfish directly on your machine for faster development iteration.
+Your **production Dockerfile already has Stockfish installed** at [Dockerfile:35](../../../Dockerfile#L35):
 
-### Approach B: Docker (Production-Ready) ⭐ **RECOMMENDED**
-Use Docker container with Stockfish - ensures consistency across dev/staging/prod.
+```dockerfile
+RUN apk --no-cache add ca-certificates postgresql-client stockfish
+```
 
-**We'll do BOTH**: Local for development, Docker for deployment.
+✅ **Production deployment is ready!** No changes needed.
+
+We only need to:
+1. Install Stockfish locally for development
+2. Add Stockfish to **Dockerfile.dev** (development)
+3. Add environment variable to docker-compose.yml
 
 ---
 
@@ -63,133 +68,71 @@ which stockfish
 
 ---
 
-## 🐳 Part 2: Docker Containerization (Production)
+## 🐳 Part 2: Update Development Docker Setup
 
-### Why Docker?
-
-✅ **Consistency**: Works same way on local, staging, production
-✅ **No "works on my machine"**: Everyone uses same Stockfish version
-✅ **Easy deployment**: Ship container to any cloud provider
-✅ **Isolation**: Stockfish runs in isolated environment
-✅ **Version control**: Lock specific Stockfish version
+Your production Dockerfile is already perfect! We just need to update the **development** setup.
 
 ---
 
-## 📁 Step 1: Update Dockerfile
+## 📁 Step 1: Update Dockerfile.dev
 
-### File: `backend/Dockerfile`
+### File: [backend/Dockerfile.dev](../../../Dockerfile.dev)
 
+**Current line 6**:
 ```dockerfile
-# Multi-stage build for smaller image
-FROM golang:1.25-alpine AS builder
-
-# Install build dependencies
-RUN apk add --no-cache git
-
-WORKDIR /app
-
-# Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy source code
-COPY . .
-
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /chess-coach-backend ./cmd/server
-
-# Final stage - runtime image
-FROM alpine:latest
-
-# Install Stockfish and required libraries
-RUN apk add --no-cache \
-    stockfish \
-    ca-certificates
-
-# Create non-root user
-RUN adduser -D -u 1000 appuser
-
-WORKDIR /app
-
-# Copy binary from builder
-COPY --from=builder /chess-coach-backend .
-
-# Copy any config files if needed
-# COPY --from=builder /app/config ./config
-
-# Change ownership
-RUN chown -R appuser:appuser /app
-
-USER appuser
-
-# Expose port
-EXPOSE 8080
-
-# Run the application
-CMD ["./chess-coach-backend"]
+RUN apk add --no-cache git make postgresql-client
 ```
 
-**Key Points**:
-- ✅ `stockfish` installed via Alpine package manager
-- ✅ Small final image (~50MB vs 1GB+)
-- ✅ Runs as non-root user for security
-- ✅ Multi-stage build for efficiency
+**Change to** (add `stockfish`):
+```dockerfile
+RUN apk add --no-cache git make postgresql-client stockfish
+```
+
+That's it! Just add `stockfish` to the existing `apk add` command.
 
 ---
 
 ## 📁 Step 2: Update docker-compose.yml
 
-### File: `backend/docker-compose.yml`
+### File: [backend/docker-compose.yml](../../../docker-compose.yml)
+
+**Find the `api` service environment section** (around line 31):
 
 ```yaml
-version: '3.8'
-
-services:
-  # Backend API with Stockfish
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
+  api:
+    # ... existing config ...
     environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/chess_coach?sslmode=disable
-      - STOCKFISH_PATH=/usr/games/stockfish  # Path in Alpine
-      - GIN_MODE=release
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - chess-network
-    restart: unless-stopped
+      - PORT=8080
+      - GIN_MODE=debug
+      - ENVIRONMENT=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=chess_coach
+      - DB_PASSWORD=chess_coach_dev
+      - DB_NAME=chess_coach_dev
+      - DB_SSLMODE=disable
+```
 
-  # PostgreSQL Database
-  db:
-    image: postgres:16-alpine
+**Add this line** after `DB_SSLMODE`:
+```yaml
+      - STOCKFISH_PATH=/usr/games/stockfish
+```
+
+**Result**:
+```yaml
+  api:
+    # ... existing config ...
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=chess_coach
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - chess-network
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-
-networks:
-  chess-network:
-    driver: bridge
+      - PORT=8080
+      - GIN_MODE=debug
+      - ENVIRONMENT=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=chess_coach
+      - DB_PASSWORD=chess_coach_dev
+      - DB_NAME=chess_coach_dev
+      - DB_SSLMODE=disable
+      - STOCKFISH_PATH=/usr/games/stockfish  # ← ADD THIS LINE
 ```
 
 ---
@@ -278,32 +221,43 @@ quit
 ```bash
 cd /Users/ankit/code/learn/chess-coach/backend
 
-# Build Docker image
-docker-compose build backend
+# Build Docker image (development)
+docker-compose build api
 
 # Check if Stockfish is in the image
-docker run --rm chess-coach-backend which stockfish
+docker run --rm chess-coach-api which stockfish
 # Should output: /usr/games/stockfish
 
 # Test Stockfish in container
-docker run --rm -it chess-coach-backend stockfish
-# Should start Stockfish UCI interface
+docker run --rm -it chess-coach-api stockfish
+# Type 'uci' then 'quit' to test
 ```
 
-### Test Full Stack
+### Test Full Development Stack
 
 ```bash
 # Start everything
 docker-compose up -d
 
-# Check logs
-docker-compose logs -f backend
+# Check api service logs
+docker-compose logs -f api
 
-# You should see:
-# "Stockfish AI initialized at /usr/games/stockfish"
-
-# Stop
+# Stop when done testing
 docker-compose down
+```
+
+### Test Production Build
+
+```bash
+# Build production image
+docker build -t chess-coach-backend -f Dockerfile .
+
+# Verify Stockfish in production image
+docker run --rm chess-coach-backend sh -c "which stockfish"
+# Should output: /usr/games/stockfish
+
+# Test Stockfish
+docker run --rm -it chess-coach-backend stockfish
 ```
 
 ---

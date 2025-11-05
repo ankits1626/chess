@@ -32,7 +32,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server
 # Runtime stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates postgresql-client
+RUN apk --no-cache add ca-certificates postgresql-client stockfish
 
 WORKDIR /root/
 

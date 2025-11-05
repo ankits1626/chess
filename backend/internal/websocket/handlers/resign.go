@@ -7,6 +7,7 @@ import (
 
 	"github.com/ankits1626/chess-coach-backend/internal/database"
 	"github.com/ankits1626/chess-coach-backend/internal/websocket"
+	"github.com/ankits1626/chess-coach-backend/internal/websocket/handlers/player"
 )
 
 // ResignHandler handles game resignations.
@@ -43,17 +44,14 @@ func (h *ResignHandler) handleForfeit(ctx context.Context, client *websocket.Cli
 	}
 
 	var result string
-	var winner *websocket.Client
-	var loser *websocket.Client
+	var winnerSide string
 
 	if playerSide == "white" {
 		result = "0-1" // Black wins
-		winner = activeGame.BlackPlayer
-		loser = activeGame.WhitePlayer
+		winnerSide = "black"
 	} else {
 		result = "1-0" // White wins
-		winner = activeGame.WhitePlayer
-		loser = activeGame.BlackPlayer
+		winnerSide = "white"
 	}
 
 	log.Printf("Forfeit: Game %s - %s resigned, result: %s", gameIDStr, client.UserID, result)
@@ -69,25 +67,32 @@ func (h *ResignHandler) handleForfeit(ctx context.Context, client *websocket.Cli
 	}
 
 	// Send response to resigner
-	websocket.SendSuccessResponse(loser, requestID, map[string]interface{}{
+	websocket.SendSuccessResponse(client, requestID, map[string]interface{}{
 		"message":  "You resigned",
 		"result":   result,
 		"gameOver": true,
 	})
 
-	// Notify winner
-	opponentResignedEvent := websocket.NewEvent("opponentResigned", map[string]interface{}{
-		"gameId":   gameIDStr,
-		"result":   result,
-		"gameOver": true,
-		"message":  "Opponent resigned",
-	})
-	winner.SendMessage(opponentResignedEvent)
+	// Notify both players via Player interface
+	gameResult := &player.GameResult{
+		Winner: winnerSide,
+		Method: "resignation",
+		PGN:    "", // TODO: Get PGN
+	}
+
+	// Notify white player
+	if err := activeGame.WhitePlayer.NotifyGameEnd(*gameResult); err != nil {
+		log.Printf("Forfeit: Failed to notify white player: %v", err)
+	}
+
+	// Notify black player
+	if err := activeGame.BlackPlayer.NotifyGameEnd(*gameResult); err != nil {
+		log.Printf("Forfeit: Failed to notify black player: %v", err)
+	}
 
 	// Clean up
 	h.manager.RemoveActiveGame(gameIDStr)
-	loser.SetGameID("")
-	winner.SetGameID("")
+	client.SetGameID("")
 
 	return nil
 }
@@ -108,7 +113,7 @@ func (h *LeaveGameHandler) Handle(ctx context.Context, client *websocket.Client,
 
 	// Check pending game
 	if pending, exists := h.manager.GetPendingGame(gameIDStr); exists {
-		if pending.WhitePlayer.ID == client.ID {
+		if pending.WhitePlayer.GetID() == client.ID {
 			h.manager.RemovePendingGame(gameIDStr)
 			client.SetGameID("")
 

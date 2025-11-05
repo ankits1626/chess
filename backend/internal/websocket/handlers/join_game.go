@@ -7,6 +7,7 @@ import (
 
 	"github.com/ankits1626/chess-coach-backend/internal/database"
 	"github.com/ankits1626/chess-coach-backend/internal/websocket"
+	"github.com/ankits1626/chess-coach-backend/internal/websocket/handlers/player"
 )
 
 // JoinGameHandler handles joining existing games.
@@ -45,8 +46,20 @@ func (h *JoinGameHandler) Handle(ctx context.Context, client *websocket.Client, 
 		return fmt.Errorf("game not found or already started")
 	}
 
-	// 3. Verify not joining own game
-	if pending.WhitePlayer.UserID == client.UserID {
+	// 3. Only allow joining human vs human games
+	if pending.Mode != player.GameModeHumanVsHuman {
+		return fmt.Errorf("cannot join this game mode")
+	}
+
+	// 4. Get white player's client (must be human player)
+	whiteHuman, ok := pending.WhitePlayer.(*player.HumanPlayer)
+	if !ok {
+		return fmt.Errorf("white player is not a human player")
+	}
+
+	// 5. Verify not joining own game
+	whiteClient := whiteHuman.GetClient()
+	if whiteClient.UserID == client.UserID {
 		return fmt.Errorf("cannot join your own game")
 	}
 
@@ -75,22 +88,22 @@ func (h *JoinGameHandler) Handle(ctx context.Context, client *websocket.Client, 
 
 	// 6. Set game IDs
 	client.SetGameID(gameIDStr)
-	pending.WhitePlayer.SetGameID(gameIDStr)
+	whiteClient.SetGameID(gameIDStr)
 
 	// 7. Create room and add both players
 	room := websocket.NewRoom(gameIDStr)
-	pending.WhitePlayer.JoinRoom(room)
+	whiteClient.JoinRoom(room)
 	client.JoinRoom(room)
 
 	log.Printf("JoinGame: Game %s started - White: %s, Black: %s",
-		gameIDStr, pending.WhitePlayer.UserID, client.UserID)
+		gameIDStr, whiteClient.UserID, client.UserID)
 
 	// 8. Send success response to joiner
 	websocket.SendSuccessResponse(client, msg.ID, map[string]interface{}{
 		"gameId":      gameIDStr,
 		"status":      "active",
 		"side":        "black",
-		"opponent":    pending.WhitePlayer.UserID,
+		"opponent":    whiteClient.UserID,
 		"timeControl": pending.TimeControl,
 		"fen":         activeGame.CurrentFEN,
 	})
@@ -102,7 +115,7 @@ func (h *JoinGameHandler) Handle(ctx context.Context, client *websocket.Client, 
 		"side":     "black",
 		"fen":      activeGame.CurrentFEN,
 	})
-	pending.WhitePlayer.SendMessage(opponentJoinedEvent)
+	whiteClient.SendMessage(opponentJoinedEvent)
 
 	return nil
 }

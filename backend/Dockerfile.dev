@@ -2,8 +2,18 @@ FROM golang:1.25.3-alpine
 
 WORKDIR /app
 
-# Install development tools
-RUN apk add --no-cache git make postgresql-client
+# Install development tools and Stockfish build dependencies
+RUN apk add --no-cache curl g++ git make postgresql-client
+
+# Build and install Stockfish from source
+RUN cd /tmp && \
+    git clone --depth 1 --branch sf_17.1 https://github.com/official-stockfish/Stockfish.git && \
+    cd Stockfish/src && \
+    make -j$(nproc) build ARCH=$(uname -m | sed 's/x86_64/x86-64/;s/aarch64/armv8/') && \
+    cp stockfish /usr/local/bin/stockfish && \
+    chmod +x /usr/local/bin/stockfish && \
+    cd / && \
+    rm -rf /tmp/Stockfish
 
 # Install Air (hot reload)
 RUN go install github.com/air-verse/air@latest

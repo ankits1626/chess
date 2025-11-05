@@ -7,6 +7,7 @@ import (
 
 	"github.com/ankits1626/chess-coach-backend/internal/database"
 	"github.com/ankits1626/chess-coach-backend/internal/websocket"
+	"github.com/ankits1626/chess-coach-backend/internal/websocket/handlers/player"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -28,10 +29,26 @@ type CreateGameHandler struct {
 //	  }
 //	}
 func (h *CreateGameHandler) Handle(ctx context.Context, client *websocket.Client, msg *websocket.Message) error {
-	// 1. Extract and validate time control
+	// 1. Extract and validate parameters
 	timeControl, err := websocket.RequireString(msg.Data, "timeControl")
 	if err != nil {
 		return err
+	}
+
+	// Extract mode (default: humanVsComputer)
+	modeStr, ok := msg.Data["mode"].(string)
+	if !ok || modeStr == "" {
+		modeStr = "humanVsComputer"
+	}
+	mode := player.GameMode(modeStr)
+	if err := mode.Validate(); err != nil {
+		return fmt.Errorf("invalid game mode: %w", err)
+	}
+
+	// Extract difficulty (default: medium)
+	difficulty, ok := msg.Data["difficulty"].(string)
+	if !ok || difficulty == "" {
+		difficulty = "medium"
 	}
 
 	seconds, err := websocket.ValidateTimeControl(timeControl)
@@ -70,18 +87,55 @@ func (h *CreateGameHandler) Handle(ctx context.Context, client *websocket.Client
 	log.Printf("CreateGame: Database generated game ID: %s", gameIDStr)
 
 	// 6. Add to pending games
-	h.manager.CreatePendingGame(gameIDStr, client, timeControl)
+	if err := h.manager.CreatePendingGame(gameIDStr, mode, client, difficulty, timeControl); err != nil {
+		log.Printf("CreateGame: Failed to create pending game: %v", err)
+		return fmt.Errorf("failed to create pending game: %w", err)
+	}
 
-	// 6. Set client's game ID
+	// 7. Set client's game ID
 	client.SetGameID(gameIDStr)
 
+	// 8. For modes that don't need a second human player, auto-activate
+	if mode == player.GameModeHumanVsComputer {
+		log.Printf("CreateGame: Auto-activating computer game %s", gameIDStr)
+
+		// Activate with nil blackClient (computer will be created)
+		activeGame, err := h.manager.ActivateGame(gameIDStr, nil)
+		if err != nil {
+			log.Printf("CreateGame: Failed to activate game: %v", err)
+			return fmt.Errorf("failed to activate game: %w", err)
+		}
+
+		// Send success response for active game
+		websocket.SendSuccessResponse(client, msg.ID, map[string]interface{}{
+			"gameId":      gameIDStr,
+			"status":      "active",
+			"side":        "white",
+			"mode":        string(mode),
+			"difficulty":  difficulty,
+			"timeControl": timeControl,
+			"fen":         activeGame.CurrentFEN,
+		})
+
+		// Trigger computer move if computer is white (in background)
+		go func() {
+			if err := h.manager.HandleComputerMove(context.Background(), gameIDStr); err != nil {
+				log.Printf("CreateGame: Computer move failed: %v", err)
+			}
+		}()
+
+		return nil
+	}
+
+	// For human vs human, wait for second player
 	log.Printf("CreateGame: Game %s created successfully, waiting for opponent", gameIDStr)
 
-	// 7. Send success response
+	// 9. Send success response
 	websocket.SendSuccessResponse(client, msg.ID, map[string]interface{}{
 		"gameId":      gameIDStr,
 		"status":      "waiting",
 		"side":        "white",
+		"mode":        string(mode),
 		"timeControl": timeControl,
 		"fen":         h.manager.GetChessService().GetStartingPosition(),
 	})
