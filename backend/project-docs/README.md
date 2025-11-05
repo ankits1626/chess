@@ -237,6 +237,30 @@ When adding new documentation:
 
 ---
 
-**Last Updated:** 2025-11-02
-**Current Step:** 24
-**Next Step:** 25 (WebSocket Implementation or Advanced Features)
+## Phase 8: WebSocket Implementation (Current)
+
+**[Step 25: WebSocket Implementation](./websockets/)**
+
+Comprehensive WebSocket implementation broken into manageable phases:
+
+- **[Overview & Fixes](./websockets/00-overview-and-fixes.md)** - Analysis of requirements and fixes
+- **[Implementation Checklist](./websockets/implementation-checklist.md)** - Step-by-step tracking
+- **[Phase 1: Foundation](./websockets/01-foundation.md)** - Core WebSocket components
+- **[Phase 2: Integration](./websockets/02-integration.md)** - Connect to existing app
+- **[Phase 3: Utilities](./websockets/03-utilities.md)** - Helper functions
+- **[Phase 4: Handlers](./websockets/04-message-handlers.md)** - Business logic
+- **[Phase 5: Authentication](./websockets/05-authentication.md)** - Security
+- **[Phase 6: Testing](./websockets/06-testing.md)** - Test coverage
+- **[Phase 7: Production](./websockets/07-deployment.md)** - Deployment readiness
+
+**Status**: 📋 Planning Complete - Ready for Implementation
+
+**Estimated Time**: 21-30 hours across 7 phases
+
+See [websockets/README.md](./websockets/README.md) for complete navigation and progress tracking.
+
+---
+
+**Last Updated:** 2025-11-05
+**Current Step:** 25 (WebSocket Implementation - Planning Complete)
+**Next Step:** Start implementation with Phase 1

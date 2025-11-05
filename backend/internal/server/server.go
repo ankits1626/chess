@@ -9,6 +9,7 @@ import (
 	"github.com/ankits1626/chess-coach-backend/internal/config"
 	"github.com/ankits1626/chess-coach-backend/internal/database"
 	"github.com/ankits1626/chess-coach-backend/internal/router"
+	"github.com/ankits1626/chess-coach-backend/internal/websocket"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,9 +27,9 @@ type server struct {
 }
 
 // New creates a new Server with given config.
-func New(cfg *config.Config, db *database.DB) Server {
+func New(cfg *config.Config, db *database.DB, hub *websocket.Hub) Server {
 	gin.SetMode(cfg.GinMode)
-	r := router.Setup(db)
+	r := router.Setup(db, hub)
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),

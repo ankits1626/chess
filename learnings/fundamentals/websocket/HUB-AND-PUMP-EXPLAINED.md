@@ -69,7 +69,7 @@ Think of it like **two one-way streets** instead of a single two-way street that
 │                    └──────┬───────┘                     │
 │                           │                             │
 │                    ┌──────┴──────┐                      │
-│                    │              │                     │
+│                    │             │                      │
 │            ┌───────▼────┐   ┌────▼───────┐              │
 │            │ readPump   │   │ writePump  │              │
 │            │ goroutine  │   │ goroutine  │              │

@@ -11,6 +11,8 @@ import (
 	"github.com/ankits1626/chess-coach-backend/internal/database"
 	"github.com/ankits1626/chess-coach-backend/internal/logger"
 	"github.com/ankits1626/chess-coach-backend/internal/server"
+	"github.com/ankits1626/chess-coach-backend/internal/websocket"
+	"github.com/ankits1626/chess-coach-backend/internal/websocket/handlers"
 )
 
 // App manages application lifecycle.
@@ -19,20 +21,35 @@ type App struct {
 	db     *database.DB
 	server server.Server
 	logger logger.Logger
+	wsHub  *websocket.Hub
 }
 
 // New creates new application.
 func New(cfg *config.Config, db *database.DB, log logger.Logger) *App {
+	// Create chess service
+	chessService := handlers.NewChessService()
+
+	// Create game manager
+	gameManager := handlers.NewGameManager(db, chessService)
+
+	// Create handler router
+	handler := handlers.NewHandlerRouter(gameManager)
+	hub := websocket.NewHub(handler)
 	return &App{
 		config: cfg,
 		db:     db,
-		server: server.New(cfg, db),
+		server: server.New(cfg, db, hub),
 		logger: log,
+		wsHub:  hub,
 	}
 }
 
 // Run starts application and handles graceful shutdown.
 func (a *App) Run(ctx context.Context) error {
+	// Start WebSocket hub
+	go a.wsHub.Run()
+	a.logger.Info("WebSocket Hub started")
+
 	// Start server in goroutine
 	go func() {
 		if err := a.server.Start(); err != nil {
@@ -42,6 +59,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	a.logger.Infof("Server started on port %s", a.config.Port)
 	a.logger.Infof("Swagger UI: http://localhost:%s/swagger/index.html", a.config.Port)
+	a.logger.Infof("WebSocket endpoint: ws://localhost:%s/ws?user_id=test", a.config.Port)
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
@@ -49,6 +67,10 @@ func (a *App) Run(ctx context.Context) error {
 	<-quit
 
 	a.logger.Info("Shutting down server...")
+
+	// Shutdown WebSocket hub first
+	a.wsHub.Shutdown()
+	a.logger.Info("WebSocket Hub stopped")
 
 	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(ctx, a.config.ShutdownTimeout)

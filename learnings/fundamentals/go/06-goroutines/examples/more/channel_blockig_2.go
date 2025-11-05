@@ -8,4 +8,5 @@ func main() {
 	n <- 1
 
 	fmt.Printf("This line never runs")
+	
 }

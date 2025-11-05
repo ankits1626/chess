@@ -12,7 +12,7 @@ func main() {
 	go func() {
 		fmt.Println("📤 Goroutine: Sending 'ping'...")
 		messages <- "ping" // ← Send INTO channel
-		messages <- "ping 2"
+		// messages <- "ping 2"
 		fmt.Println("📤 Goroutine: Sent!")
 	}()
 
