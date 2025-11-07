@@ -1,7 +1,8 @@
 # Chess Coach Backend - Complete Execution Flow Guide for Beginners
 
-> **Last Updated:** 2025-11-05
-> **Purpose:** Understand how the Go backend server runs from start to finish, including HTTP REST API, WebSocket real-time communication, and database interactions.
+> **Last Updated:** 2025-11-07
+> **Status:** ✅ Fully Implemented & Working
+> **Purpose:** Understand how the Go backend server runs from start to finish, including HTTP REST API, WebSocket real-time communication, Stockfish AI integration, and database interactions.
 
 ---
 
@@ -14,11 +15,12 @@
 5. [Phase 2: Server Initialization](#phase-2-server-initialization)
 6. [Phase 3: HTTP REST API Flow](#phase-3-http-rest-api-flow)
 7. [Phase 4: WebSocket Real-Time Communication](#phase-4-websocket-real-time-communication)
-8. [Phase 5: Database Layer](#phase-5-database-layer)
-9. [Complete Request Flow Examples](#complete-request-flow-examples)
-10. [Concurrency & Goroutines](#concurrency--goroutines)
-11. [Key Design Patterns](#key-design-patterns)
-12. [Troubleshooting & Common Issues](#troubleshooting--common-issues)
+8. [Phase 5: Computer Player & AI Integration](#phase-5-computer-player--ai-integration)
+9. [Phase 6: Database Layer](#phase-6-database-layer)
+10. [Complete Request Flow Examples](#complete-request-flow-examples)
+11. [Concurrency & Goroutines](#concurrency--goroutines)
+12. [Key Design Patterns](#key-design-patterns)
+13. [Troubleshooting & Common Issues](#troubleshooting--common-issues)
 
 ---
 
@@ -28,6 +30,7 @@ The Chess Coach backend is a Go application that provides:
 
 - **REST API** for CRUD operations (users, games, moves)
 - **WebSocket** for real-time chess game updates
+- **Stockfish AI** integration for computer opponent gameplay
 - **PostgreSQL** database for persistent storage
 - **Graceful shutdown** for clean server termination
 
@@ -35,6 +38,8 @@ The Chess Coach backend is a Go application that provides:
 - **Language:** Go 1.23+
 - **Web Framework:** Gin (HTTP router)
 - **WebSocket:** gorilla/websocket
+- **Chess Engine:** Stockfish (via UCI protocol)
+- **Chess Logic:** notnil/chess library
 - **Database:** PostgreSQL with pgx driver
 - **SQL Type Safety:** sqlc (generates Go code from SQL)
 
@@ -63,10 +68,17 @@ backend/
 │   │   └── v1_routes.go               # 📍 API v1 route registration
 │   │
 │   ├── handler/v1/
-│   │   ├── user/handler.go            # 👤 User HTTP endpoints
-│   │   ├── game/handler.go            # ♟️ Game HTTP endpoints
-│   │   ├── move/handler.go            # 🎯 Move HTTP endpoints
-│   │   └── health/handler.go          # ❤️ Health check
+│   │   ├── user/
+│   │   │   ├── handler.go             # 👤 User HTTP endpoints
+│   │   │   └── dto.go                 # 📦 User DTOs
+│   │   ├── game/
+│   │   │   ├── handler.go             # ♟️ Game HTTP endpoints
+│   │   │   └── dto.go                 # 📦 Game DTOs
+│   │   ├── move/
+│   │   │   ├── handler.go             # 🎯 Move HTTP endpoints
+│   │   │   └── dto.go                 # 📦 Move DTOs
+│   │   └── health/
+│   │       └── handler.go             # ❤️ Health check
 │   │
 │   ├── repository/
 │   │   ├── user_repository.go         # 💾 User data access
@@ -76,14 +88,34 @@ backend/
 │   ├── database/
 │   │   ├── connection.go              # 🔌 Database connection pool
 │   │   ├── db.go                      # 🗄️ sqlc generated base
+│   │   ├── querier.go                 # 📝 sqlc query interface
+│   │   ├── models.go                  # 📊 Database models
 │   │   └── *.sql.go                   # 📝 sqlc generated queries
 │   │
 │   ├── websocket/
-│   │   ├── hub.go                     # 🎪 WebSocket hub (manager)
+│   │   ├── hub.go                     # 🎪 WebSocket hub (connection manager)
 │   │   ├── client.go                  # 🔌 WebSocket client connection
 │   │   ├── room.go                    # 🏠 Game room management
-│   │   ├── message.go                 # 📨 Message types
-│   │   └── upgrade.go                 # 🔄 HTTP → WebSocket upgrade
+│   │   ├── message.go                 # 📨 Message types & utilities
+│   │   ├── upgrade.go                 # 🔄 HTTP → WebSocket upgrade
+│   │   ├── utils.go                   # 🛠️ Helper functions
+│   │   └── handlers/
+│   │       ├── handler.go             # 🎮 Message handler router
+│   │       ├── game_manager.go        # 🎲 Game state manager
+│   │       ├── chess_service.go       # ♟️ Chess logic wrapper
+│   │       ├── create_game.go         # 🆕 Create game handler
+│   │       ├── join_game.go           # 🚪 Join game handler
+│   │       ├── make_move.go           # 🎯 Make move handler
+│   │       ├── resign.go              # 🏳️ Resign handler
+│   │       └── player/
+│   │           ├── types.go           # 📋 Player interfaces
+│   │           ├── player.go          # 🎭 Base player
+│   │           ├── human_player.go    # 👤 Human player
+│   │           ├── computer_player.go # 🤖 AI player
+│   │           ├── ai_service.go      # 🧠 AI service interface
+│   │           ├── factory.go         # 🏭 Player factory
+│   │           ├── game_mode.go       # 🎮 Game mode types
+│   │           └── config.go          # ⚙️ AI configuration
 │   │
 │   └── logger/
 │       └── logger.go                  # 📋 Logging utility
@@ -103,7 +135,7 @@ backend/
 ┌─────────────────────────────────────────────────────────────────┐
 │                         CLIENT LAYER                            │
 │  - Web Browser (HTTP REST API)                                  │
-│  - WebSocket Client (Real-time updates)                         │
+│  - WebSocket Client (Real-time chess gameplay)                  │
 └────────────────┬────────────────────────────────────┬───────────┘
                  │                                    │
                  ▼                                    ▼
@@ -131,15 +163,27 @@ backend/
              │                               │
              ▼                               ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                     REPOSITORY LAYER                             │
-│   (Business Logic & Data Access)                                 │
+│                    GAME MANAGER & HANDLERS                       │
+│   (WebSocket Message Processing)                                 │
 │                                                                  │
-│  • UserRepository                                                │
-│  • GameRepository                                                │
-│  • MoveRepository                                                │
+│  • HandlerRouter - Routes messages to handlers                   │
+│  • GameManager - Manages game state & player turns              │
+│  • ChessService - Chess logic (via notnil/chess)                │
+│  • Player System - Human & Computer players                     │
 └─────────────────────────────┬────────────────────────────────────┘
                               │
-                              ▼
+             ┌────────────────┴────────────────┐
+             ▼                                 ▼
+┌──────────────────────────┐    ┌──────────────────────────────┐
+│  STOCKFISH AI ENGINE     │    │  REPOSITORY LAYER            │
+│  (Computer Player)       │    │  (Business Logic & DB)       │
+│                          │    │                              │
+│  • UCI Protocol          │    │  • UserRepository            │
+│  • Move calculation      │    │  • GameRepository            │
+│  • Difficulty levels     │    │  • MoveRepository            │
+└──────────────────────────┘    └─────────────┬────────────────┘
+                                              │
+                                              ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                     DATABASE LAYER                               │
 │   (sqlc Generated Queries + pgxpool)                             │
@@ -189,6 +233,9 @@ When you run `go run cmd/server/main.go`, this is what happens step by step:
         ↓
 
 4️⃣  Create Application Instance
+    ├─ Initialize Chess Service (notnil/chess wrapper)
+    ├─ Initialize AI Service (Stockfish integration)
+    ├─ Initialize Game Manager (game state + players)
     ├─ Initialize WebSocket Hub
     ├─ Initialize HTTP Server (with router)
     ├─ File: internal/app/app.go
@@ -208,8 +255,6 @@ When you run `go run cmd/server/main.go`, this is what happens step by step:
 // File: cmd/server/main.go
 
 func main() {
-    ctx := context.Background()
-
     // Step 1: Load configuration
     cfg := config.Load()
 
@@ -217,18 +262,21 @@ func main() {
     appLogger := logger.NewStdLogger()
 
     // Step 3: Connect to database
+    ctx := context.Background()
     db, err := database.NewDB(ctx, cfg.DSN())
     if err != nil {
-        log.Fatal("Failed to connect to database:", err)
+        log.Fatalf("Failed to connect to database: %v", err)
     }
-    defer db.Close()
 
-    // Step 4: Create application
+    // Step 4: Create application (includes AI service initialization)
     application := app.New(cfg, db, appLogger)
+    defer application.Close() // Ensures Stockfish process cleanup
+
+    appLogger.Info("Database connected successfully")
 
     // Step 5: Run application (blocks until shutdown)
     if err := application.Run(ctx); err != nil {
-        log.Fatal("Application error:", err)
+        log.Fatalf("Application error: %v", err)
     }
 }
 ```
@@ -243,11 +291,12 @@ The `app.App` struct manages the entire application lifecycle:
 
 ```go
 type App struct {
-    config *config.Config
-    db     *database.DB
-    server *server.Server
-    logger logger.Logger
-    wsHub  *websocket.Hub
+    config    *config.Config
+    db        *database.DB
+    server    server.Server
+    logger    logger.Logger
+    wsHub     *websocket.Hub
+    aiService player.AIService // Stockfish AI service
 }
 ```
 
@@ -258,20 +307,46 @@ type App struct {
 │                   app.New() - Create Application                │
 └─────────────────────────────────────────────────────────────────┘
 
-1️⃣  Create WebSocket Hub
-    └─ websocket.NewHub(nil)
+1️⃣  Create Chess Service
+    └─ handlers.NewChessService()
+        • Wraps notnil/chess library
+        • Validates moves, detects game over
+        ↓
+
+2️⃣  Initialize Stockfish AI Service
+    └─ player.NewStockfishService()
+        • Starts Stockfish engine process
+        • Establishes UCI communication
+        • Configures difficulty levels
+        ↓
+
+3️⃣  Create Game Manager
+    └─ handlers.NewGameManager(db, chessService, aiService)
+        • Manages active games
+        • Handles player turns
+        • Coordinates human & computer players
+        ↓
+
+4️⃣  Create Handler Router
+    └─ handlers.NewHandlerRouter(gameManager)
+        • Routes WebSocket messages to handlers
+        • Registers: createGame, joinGame, makeMove, resign
+        ↓
+
+5️⃣  Create WebSocket Hub
+    └─ websocket.NewHub(handlerRouter)
         • Hub manages all WebSocket connections
         • Runs in its own goroutine
         ↓
 
-2️⃣  Create HTTP Server
+6️⃣  Create HTTP Server
     └─ server.New(cfg, db, hub)
         • Sets up Gin router
         • Registers all routes
         • Configures HTTP server
         ↓
 
-3️⃣  Return App Instance
+7️⃣  Return App Instance
     └─ Contains all initialized components
 ```
 
@@ -299,7 +374,7 @@ type App struct {
 3️⃣  Log Server Information
     • Server running on: http://localhost:8080
     • Swagger UI: http://localhost:8080/swagger/index.html
-    • WebSocket: ws://localhost:8080/ws
+    • WebSocket: ws://localhost:8080/ws?user_id=test
         ↓
 
 4️⃣  Wait for Shutdown Signal
@@ -312,45 +387,17 @@ type App struct {
        • Close all active connections
        • Clean up rooms
 
-    b) Shutdown HTTP Server (with 5s timeout)
+    b) Shutdown Stockfish AI Service
+       • Send quit command to engine
+       • Wait for process termination
+       • Clean up resources
+
+    c) Shutdown HTTP Server (with 5s timeout)
        • Stop accepting new requests
        • Wait for active requests to complete
        • Force close after timeout
 
-    c) Database connections auto-close (defer in main)
-```
-
-### Router Setup: `internal/router/router.go`
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              router.Setup() - Configure Routes                  │
-└─────────────────────────────────────────────────────────────────┘
-
-1️⃣  Create Gin Engine
-    gin.Default()
-    • Logger middleware (logs requests)
-    • Recovery middleware (panic recovery)
-        ↓
-
-2️⃣  Register Swagger Documentation
-    GET /swagger/*any
-    • API documentation UI
-    • Auto-generated from code comments
-        ↓
-
-3️⃣  Register WebSocket Endpoint
-    GET /ws
-    • Upgrades HTTP → WebSocket connection
-    • Handled by websocket.Handler
-        ↓
-
-4️⃣  Register API v1 Routes
-    /api/v1/...
-    • User routes
-    • Game routes
-    • Move routes
-    • Health check
+    d) Close database connections (defer in main)
 ```
 
 ---
@@ -387,105 +434,25 @@ type App struct {
 
 ### Request Flow Example: Creating a User
 
-Let's trace what happens when you send `POST /api/v1/users`:
-
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │            REQUEST: POST /api/v1/users                          │
 │            BODY: {"username": "alice", "email": "a@b.com"}      │
 └─────────────────────────────────────────────────────────────────┘
 
-1️⃣  Gin Router (router/v1_routes.go:37)
-    • Matches route: POST /api/v1/users
-    • Calls: userHandler.Create
-        ↓
-
-2️⃣  Handler (handler/v1/user/handler.go)
-    func (h *UserHandler) Create(c *gin.Context) {
-
-        a) Bind JSON Request
-           • Parse request body
-           • Validate required fields (username, email)
-           • Map to CreateRequest struct
-
-        b) Set Default Rating
-           • If not provided, default to 1200
-
-        c) Call Repository
-           user, err := h.repo.Create(ctx, username, email, rating)
-
-        d) Handle Response
-           • If error → return 500
-           • If success → return 201 with user data
-    }
-        ↓
-
-3️⃣  Repository (repository/user_repository.go)
-    func (r *UserRepository) Create(...) {
-
-        a) Build Database Parameters
-           params := database.CreateUserParams{
-               Username: username,
-               Email:    email,
-               Rating:   rating,
-           }
-
-        b) Call Database Layer
-           user, err := r.db.CreateUser(ctx, params)
-
-        c) Return Result
-           • User struct or error
-    }
-        ↓
-
-4️⃣  Database Layer (database/users.sql.go - generated by sqlc)
-    func (q *Queries) CreateUser(ctx, params) {
-
-        a) Execute SQL Query
-           INSERT INTO users (username, email, rating)
-           VALUES ($1, $2, $3)
-           RETURNING id, username, email, rating, created_at
-
-        b) Scan Result
-           • Map database row to User struct
-
-        c) Return User or Error
-    }
-        ↓
-
-5️⃣  PostgreSQL Database
-    • Executes INSERT statement
-    • Returns new row with generated ID
-        ↓
-
-6️⃣  Response Flow (Reverse Direction)
-    Database → Repository → Handler → Client
-
-    Final Response:
-    {
-        "id": "550e8400-...",
-        "username": "alice",
-        "email": "a@b.com",
-        "rating": 1200,
-        "created_at": "2025-11-05T12:00:00Z"
-    }
+1️⃣  Gin Router → userHandler.Create
+2️⃣  Handler validates request
+3️⃣  Calls repository.Create
+4️⃣  Repository calls database.CreateUser (sqlc)
+5️⃣  PostgreSQL executes INSERT
+6️⃣  Response: 201 Created with user data
 ```
-
-### Layer Responsibilities
-
-| Layer | Responsibility | Example File |
-|-------|---------------|-------------|
-| **Handler** | HTTP request/response, validation | `handler/v1/user/handler.go` |
-| **Repository** | Business logic, data transformation | `repository/user_repository.go` |
-| **Database** | SQL queries, type conversion | `database/users.sql.go` |
 
 ---
 
 ## Phase 4: WebSocket Real-Time Communication
 
-WebSocket enables real-time bidirectional communication between clients and server. Perfect for chess games where moves need to be instantly shared!
-
-### WebSocket Components
+### WebSocket Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -496,7 +463,7 @@ WebSocket enables real-time bidirectional communication between clients and serv
 │      HUB        │  Central manager (1 per server)
 │  (websocket/    │  • Registers/unregisters clients
 │   hub.go)       │  • Manages game rooms
-│                 │  • Routes messages
+│                 │  • Routes messages via HandlerRouter
 └────────┬────────┘
          │
          ├─── Manages ───┐
@@ -513,356 +480,201 @@ WebSocket enables real-time bidirectional communication between clients and serv
               ▼
        ┌──────────────┐
        │     ROOM     │  One per game
-       │ (websocket/  │  • Contains 2 clients (chess players)
+       │ (websocket/  │  • Contains 2 players (chess)
        │  room.go)    │  • Broadcasts messages to both
        └──────────────┘
 ```
 
-### Connection Flow
+### WebSocket Message Handling
 
-#### Step 1: Establish WebSocket Connection
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│    CLIENT → SERVER: ws://localhost:8080/ws?user_id=alice        │
-└─────────────────────────────────────────────────────────────────┘
-
-1️⃣  HTTP Request arrives at Gin Router
-    GET /ws?user_id=alice
-        ↓
-
-2️⃣  WebSocket Handler (websocket/upgrade.go)
-    func (h *Handler) ServeWS(c *gin.Context) {
-
-        a) Extract user_id from query parameter
-           userID := c.Query("user_id")
-           // TODO Phase 5: Extract from JWT token instead
-
-        b) Upgrade HTTP → WebSocket
-           conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-           • Uses gorilla/websocket library
-           • Switches protocol from HTTP to WebSocket
-
-        c) Create Client
-           client := websocket.NewClient(conn, hub, userID)
-           • Unique client ID generated
-           • References hub for communication
-
-        d) Register Client with Hub
-           hub.register <- client
-           • Sends client to hub's register channel
-
-        e) Start Client Goroutines
-           go client.writePump()  // Handles outbound messages
-           go client.readPump()   // Handles inbound messages
-    }
-```
-
-#### Step 2: Hub Manages Clients
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              HUB EVENT LOOP (websocket/hub.go)                  │
-│              Running continuously in goroutine                  │
-└─────────────────────────────────────────────────────────────────┘
-
-Hub Structure:
-    type Hub struct {
-        clients    map[*Client]bool      // All connected clients
-        rooms      map[string]*Room      // Game rooms (gameID → room)
-        register   chan *Client          // New client channel
-        unregister chan *Client          // Remove client channel
-        shutdown   chan struct{}         // Shutdown signal
-    }
-
-Event Loop:
-    for {
-        select {
-
-        case client := <-h.register:
-            // New client connected
-            ├─ Add to clients map
-            └─ Log connection
-
-        case client := <-h.unregister:
-            // Client disconnected
-            ├─ Remove from clients map
-            ├─ Close client send channel
-            ├─ Remove from room (if in one)
-            ├─ Delete empty rooms
-            └─ Log disconnection
-
-        case <-h.shutdown:
-            // Server shutting down
-            ├─ Close all client connections
-            ├─ Clear clients and rooms
-            └─ Exit goroutine
-        }
-    }
-```
-
-#### Step 3: Client Read/Write Pumps
-
-Each WebSocket client has TWO goroutines:
-
-##### Read Pump (Receives messages from client)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│           CLIENT.READPUMP() (websocket/client.go)               │
-│           Runs continuously in goroutine                        │
-└─────────────────────────────────────────────────────────────────┘
-
-Setup:
-    • Set read deadline (60 seconds)
-    • Set pong handler (resets deadline on pong)
-
-Read Loop:
-    for {
-        1️⃣  Read message from WebSocket
-            _, message, err := c.conn.ReadMessage()
-
-        2️⃣  If error (connection closed, timeout)
-            → Break loop and unregister
-
-        3️⃣  Process message
-            messageHandler(ctx, c, message)
-            • Parse JSON
-            • Route by message type
-            • Send response if needed
-    }
-
-On Exit:
-    • Unregister from hub
-    • Close connection
-```
-
-##### Write Pump (Sends messages to client)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│          CLIENT.WRITEPUMP() (websocket/client.go)               │
-│          Runs continuously in goroutine                         │
-└─────────────────────────────────────────────────────────────────┘
-
-Setup:
-    • Create ping ticker (54 seconds)
-
-Write Loop:
-    for {
-        select {
-
-        case message := <-c.send:
-            // Message to send to client
-            1️⃣  Set write deadline (10 seconds)
-            2️⃣  Write message to WebSocket
-            3️⃣  If error → exit loop
-
-        case <-ticker.C:
-            // Ping timeout
-            1️⃣  Send ping message
-            2️⃣  Keep connection alive
-        }
-    }
-
-On Exit:
-    • Close connection
-```
-
-### Message Flow
-
-#### Message Structure (`websocket/message.go`)
+#### Message Structure
 
 ```json
 {
     "id": "unique-message-id",
     "type": "request|response|event",
-    "action": "join_game",
-    "event": "player_joined",
+    "action": "createGame|joinGame|makeMove|resign",
     "data": {
-        "game_id": "550e8400-...",
-        "player": "alice"
+        "game_id": "uuid",
+        "move": "e2e4"
     },
-    "error": "",
     "success": true,
-    "timestamp": 1699200000
+    "error": ""
 }
 ```
 
-#### Message Types
-
-| Type | Direction | Purpose | Response Required? |
-|------|-----------|---------|-------------------|
-| **request** | Client → Server | Request action | Yes |
-| **response** | Server → Client | Reply to request | No |
-| **event** | Server → Client | Notify event | No |
-
-#### Example: Join Game Flow
+#### Handler Router Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│              EXAMPLE: PLAYER JOINS GAME ROOM                    │
+│         HandlerRouter (websocket/handlers/handler.go)           │
 └─────────────────────────────────────────────────────────────────┘
 
-1️⃣  Client sends request:
-    {
-        "id": "msg-123",
-        "type": "request",
-        "action": "join_game",
-        "data": {
-            "game_id": "game-456"
-        }
-    }
-        ↓
-
-2️⃣  Server (readPump) receives message
-        ↓
-
-3️⃣  handleMessage() processes request
-    a) Parse JSON
-    b) Validate message type and action
-    c) Get or create room for game_id
-    d) Add client to room
-        ↓
-
-4️⃣  Server sends response to client:
-    {
-        "id": "msg-123",
-        "type": "response",
-        "success": true,
-        "data": {
-            "message": "Joined game-456"
-        }
-    }
-        ↓
-
-5️⃣  Server broadcasts event to ALL players in room:
-    {
-        "type": "event",
-        "event": "player_joined",
-        "data": {
-            "player": "alice",
-            "game_id": "game-456"
-        }
-    }
-```
-
-### Room Broadcasting
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                ROOM BROADCASTING (websocket/room.go)            │
-└─────────────────────────────────────────────────────────────────┘
-
-Room Structure:
-    type Room struct {
-        ID      string
-        clients map[*Client]bool
-    }
-
-Methods:
-
-1️⃣  Broadcast(message []byte)
-    • Sends message to ALL clients in room
-
-    for client := range r.clients {
-        select {
-        case client.send <- message:
-            // Message queued
-        default:
-            // Channel full, close client
-        }
-    }
-
-2️⃣  BroadcastExcept(message []byte, exceptClient *Client)
-    • Sends to all EXCEPT one client
-    • Used for: "opponent made move" notifications
-
-    for client := range r.clients {
-        if client == exceptClient {
-            continue
-        }
-        client.send <- message
-    }
+Message arrives → HandleMessage()
+    ↓
+Check message type (must be "request")
+    ↓
+Route to specific handler based on action:
+    ├─ "createGame" → CreateGameHandler
+    ├─ "joinGame"   → JoinGameHandler
+    ├─ "makeMove"   → MakeMoveHandler
+    └─ "resign"     → ResignHandler
 ```
 
 ---
 
-## Phase 5: Database Layer
+## Phase 5: Computer Player & AI Integration
 
-### Database Connection (`internal/database/connection.go`)
+### Player System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│              DATABASE CONNECTION POOL                           │
+│                    PLAYER SYSTEM                                │
 └─────────────────────────────────────────────────────────────────┘
 
-Function: database.NewDB(ctx, dsn)
-
-1️⃣  Create Connection Pool
-    pool, err := pgxpool.New(ctx, dsn)
-    • DSN: postgres://user:pass@host:port/dbname?sslmode=disable
-    • Uses pgx library (PostgreSQL driver)
-    • Connection pooling for performance
-        ↓
-
-2️⃣  Verify Connection
-    err = pool.Ping(ctx)
-    • Tests database connectivity
-    • Fails fast if database unavailable
-        ↓
-
-3️⃣  Create DB Wrapper
-    return &DB{
-        Queries: New(pool),
-        pool:    pool,
-    }
+Player Interface (types.go)
+    ├─ HumanPlayer (human_player.go)
+    │   • Waits for WebSocket move from client
+    │   • Validates move via ChessService
+    │
+    └─ ComputerPlayer (computer_player.go)
+        • Uses Stockfish AI
+        • Calculates best move via UCI
+        • Auto-plays on its turn
 ```
 
-### Database Structure
+### Stockfish Integration
+
+#### AI Service Interface
+
+```go
+type AIService interface {
+    GetBestMove(fen string, difficulty string) (string, error)
+    Close() error
+}
+```
+
+#### Stockfish Communication (UCI Protocol)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              STOCKFISH UCI COMMUNICATION                        │
+└─────────────────────────────────────────────────────────────────┘
+
+1️⃣  Initialize Stockfish
+    • Start stockfish process
+    • Send: "uci"
+    • Wait for: "uciok"
+        ↓
+
+2️⃣  Set Difficulty (via Skill Level)
+    • easy:   skill level 0-3
+    • medium: skill level 10-13
+    • hard:   skill level 18-20
+        ↓
+
+3️⃣  Get Best Move
+    • Send: "position fen <current-fen>"
+    • Send: "go movetime <milliseconds>"
+    • Wait for: "bestmove <uci-move>"
+        ↓
+
+4️⃣  Convert UCI → SAN
+    • UCI: "e2e4"
+    • Apply to chess.Game
+    • Extract SAN: "e4"
+```
+
+### Game Flow: Human vs Computer
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│           GAME FLOW: HUMAN (WHITE) VS COMPUTER (BLACK)          │
+└─────────────────────────────────────────────────────────────────┘
+
+1️⃣  Client: CreateGame Request
+    {
+        "action": "createGame",
+        "data": {
+            "mode": "human_vs_computer",
+            "difficulty": "medium",
+            "player_color": "white"
+        }
+    }
+        ↓
+
+2️⃣  GameManager Creates Game
+    • Creates Game instance with starting FEN
+    • Creates HumanPlayer (white)
+    • Creates ComputerPlayer (black) with Stockfish
+    • Stores in activeGames map
+        ↓
+
+3️⃣  Human Makes Move (e2e4)
+    • Client sends makeMove request
+    • Validates it's human's turn
+    • Applies move via ChessService
+    • Updates FEN
+    • Broadcasts move event
+        ↓
+
+4️⃣  Computer's Turn (Auto-triggered)
+    • ComputerPlayer.PlayTurn() called
+    • Sends FEN to Stockfish
+    • Receives best move (e7e5)
+    • Applies move
+    • Broadcasts move event
+        ↓
+
+5️⃣  Game Continues
+    • Alternates between human & computer
+    • Checks for game over after each move
+    • Broadcasts final result
+```
+
+### Difficulty Levels
+
+| Difficulty | Stockfish Skill Level | Think Time | ELO Estimate |
+|------------|----------------------|------------|--------------|
+| easy       | 0-3                  | 50ms       | ~800-1000    |
+| medium     | 10-13                | 500ms      | ~1400-1600   |
+| hard       | 18-20                | 2000ms     | ~2400+       |
+
+---
+
+## Phase 6: Database Layer
+
+### Database Connection (`internal/database/connection.go`)
 
 ```go
 type DB struct {
-    *Queries
-    pool *pgxpool.Pool
+    *Queries              // sqlc generated queries
+    pool *pgxpool.Pool    // Connection pool
+}
+
+func NewDB(ctx context.Context, dsn string) (*DB, error) {
+    pool, err := pgxpool.New(ctx, dsn)
+    // ... verify connection, return DB wrapper
 }
 ```
 
 ### sqlc: Type-Safe SQL
-
-The project uses **sqlc** to generate Go code from SQL queries.
-
-#### How sqlc Works
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     sqlc WORKFLOW                               │
 └─────────────────────────────────────────────────────────────────┘
 
-1️⃣  Write SQL Queries
-    File: sql/queries/users.sql
-
+1️⃣  Write SQL Queries (sql/queries/users.sql)
     -- name: GetUser :one
     SELECT * FROM users WHERE id = $1;
-
-    -- name: CreateUser :one
-    INSERT INTO users (username, email, rating)
-    VALUES ($1, $2, $3)
-    RETURNING *;
         ↓
 
-2️⃣  Run sqlc Generate
+2️⃣  Generate Go Code
     $ sqlc generate
         ↓
 
-3️⃣  sqlc Generates Go Code
-    File: internal/database/users.sql.go
-
-    func (q *Queries) GetUser(ctx, id) (User, error)
-    func (q *Queries) CreateUser(ctx, params) (User, error)
-        ↓
-
-4️⃣  Use in Repository
+3️⃣  Use Type-Safe Functions
     user, err := db.GetUser(ctx, userID)
 ```
 
@@ -870,30 +682,30 @@ The project uses **sqlc** to generate Go code from SQL queries.
 
 ## Complete Request Flow Examples
 
-### Example 1: REST API - Get User by ID
+### Example 1: Create Human vs Computer Game
 
 ```
-GET /api/v1/users/550e8400-e29b-41d4-a716-446655440000
-
-1️⃣  Gin Router → userHandler.GetByID
-2️⃣  Handler parses UUID, validates
-3️⃣  Calls repository.GetByID
-4️⃣  Repository calls database.GetUser
-5️⃣  Database executes SQL query
-6️⃣  Response flows back: DB → Repo → Handler → Client
+1️⃣  WebSocket: createGame request
+2️⃣  CreateGameHandler validates mode & difficulty
+3️⃣  GameManager creates Game instance
+4️⃣  PlayerFactory creates HumanPlayer + ComputerPlayer
+5️⃣  Store in activeGames map
+6️⃣  Send response with game_id
+7️⃣  If player color is black, trigger computer's first move
 ```
 
-### Example 2: WebSocket - Real-Time Move
+### Example 2: Human Makes Move in Computer Game
 
 ```
-Alice makes move e2→e4:
-
-1️⃣  Alice sends WebSocket message (type: request)
-2️⃣  readPump receives and processes
-3️⃣  handleMessage validates and stores in DB
-4️⃣  Server sends response to Alice (type: response)
-5️⃣  Server broadcasts event to Bob (type: event)
-6️⃣  Both players see updated board in real-time
+1️⃣  WebSocket: makeMove request (move: "e4")
+2️⃣  MakeMoveHandler finds game in GameManager
+3️⃣  Validate it's human's turn
+4️⃣  Apply move via ChessService
+5️⃣  Check game over
+6️⃣  Broadcast move event
+7️⃣  Trigger ComputerPlayer.PlayTurn()
+8️⃣  Stockfish calculates & plays response
+9️⃣  Broadcast computer's move
 ```
 
 ---
@@ -906,6 +718,7 @@ Alice makes move e2→e4:
 MAIN GOROUTINE
 ├─ WebSocket Hub (1 goroutine)
 ├─ HTTP Server (1 goroutine)
+├─ Stockfish Process (1 per game)
 └─ Per Client (2 goroutines each)
    ├─ readPump
    └─ writePump
@@ -921,6 +734,10 @@ Hub Channels:
 
 Client Channels:
 └─ send (buffered: 256)
+
+Stockfish Channels:
+├─ stdin (pipe to process)
+└─ stdout (pipe from process)
 ```
 
 ---
@@ -928,33 +745,35 @@ Client Channels:
 ## Key Design Patterns
 
 ### 1. Layered Architecture
-
 ```
 Handler → Repository → Database
+Handler → GameManager → ChessService/AIService
 ```
 
 ### 2. Dependency Injection
-
 ```
 main → app → server → router → handlers
+app → gameManager → aiService
 ```
 
 ### 3. Repository Pattern
-
 ```
 Abstraction over data access
 ```
 
 ### 4. Hub-and-Spoke (WebSocket)
-
 ```
 Central hub manages all clients
 ```
 
-### 5. Read/Write Pumps (WebSocket)
-
+### 5. Strategy Pattern (Player System)
 ```
-Separate goroutines for read/write
+Player interface with Human/Computer implementations
+```
+
+### 6. Factory Pattern (Player Creation)
+```
+PlayerFactory creates correct player type based on game mode
 ```
 
 ---
@@ -974,21 +793,34 @@ kill -9 <PID>
 ```bash
 # Check PostgreSQL
 pg_isready -h localhost -p 5432
-brew services start postgresql
+brew services start postgresql@14
 ```
 
-### Issue 3: WebSocket Connection Fails
+### Issue 3: Stockfish Not Found
+
+```bash
+# Install Stockfish
+brew install stockfish
+
+# Verify installation
+which stockfish
+# Should output: /opt/homebrew/bin/stockfish or /usr/local/bin/stockfish
+```
+
+### Issue 4: Computer Player Not Responding
+
+```
+Check logs for:
+- "Failed to initialize AI service" → Stockfish not installed
+- "UCI communication timeout" → Stockfish process died
+- "Invalid move from engine" → FEN position might be invalid
+```
+
+### Issue 5: WebSocket Connection Fails
 
 ```javascript
 // Use ws:// not http://
 const ws = new WebSocket('ws://localhost:8080/ws?user_id=test');
-```
-
-### Issue 4: SQL Query Not Found
-
-```bash
-# Regenerate sqlc code
-sqlc generate
 ```
 
 ---
@@ -996,14 +828,29 @@ sqlc generate
 ## Summary
 
 ```
-1️⃣  Bootstrap → Load config, connect DB
-2️⃣  Initialize → Create hub, server, router
+1️⃣  Bootstrap → Load config, connect DB, init Stockfish
+2️⃣  Initialize → Create hub, server, router, game manager
 3️⃣  Runtime → Start goroutines
 4️⃣  HTTP → Router → Handler → Repo → DB
-5️⃣  WebSocket → Upgrade → Hub → Rooms → Clients
-6️⃣  Shutdown → Graceful cleanup
+5️⃣  WebSocket → Hub → HandlerRouter → GameManager
+6️⃣  Computer Player → Stockfish UCI → Move calculation
+7️⃣  Shutdown → Graceful cleanup (clients, AI, DB)
 ```
 
 ---
 
-**Happy coding! 🚀**
+## Key Features Implemented
+
+✅ REST API for users, games, moves
+✅ WebSocket real-time chess gameplay
+✅ Human vs Human mode
+✅ Human vs Computer mode (with Stockfish)
+✅ Multiple difficulty levels (easy, medium, hard)
+✅ Graceful server shutdown
+✅ Type-safe database queries (sqlc)
+✅ Comprehensive error handling
+✅ Move validation via chess.js equivalent
+
+---
+
+**Happy coding! 🚀♟️**
